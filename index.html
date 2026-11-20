@@ -158,7 +158,7 @@
                                 대기 중
                             </span>
                         </h1>
-                        <p class="text-xs text-taxi-400 font-medium">🚕 콜 택시를 부르는 중...</p>
+                        <p class="text-xs text-taxi-400 font-medium">🚕 콜택시를 부르는 중...</p>
                 </div>
             </div>
 
@@ -332,22 +332,21 @@
                     <p id="yt-helper-text" class="text-[11px] text-slate-500">
                         * 주행(공부) 중일 때만 유튜브 영상/노래를 재생할 수 있으며, 정차하거나 쉬는시간이 되면 자동으로 멈춥니다.
                     </p>
-                    <div id="yt-now-playing-card" class="hidden items-center justify-between gap-3 bg-navy-950 border border-slate-800 rounded-xl px-3.5 py-2.5">
-                        <div class="flex items-center gap-2.5 min-w-0">
-                            <span class="text-base shrink-0">🎶</span>
-                            <div class="min-w-0">
-                                <p id="yt-video-title" class="text-xs sm:text-sm font-bold text-white truncate">음원 정보를 불러오는 중...</p>
-                                <p id="yt-video-channel" class="text-[11px] text-slate-400 truncate"></p>
-                            </div>
-                        </div>
-                        <span id="yt-live-badge" class="text-[11px] font-bold px-2 py-0.5 rounded-md bg-slate-800 text-slate-400 shrink-0">대기</span>
-                    </div>
-                    <!-- 작은 유튜브 화면: 광고 건너뛰기는 유튜브가 공식 제공할 때 플레이어 안에서 가능합니다. -->
+                    <!-- 재생 정보와 유튜브 미리보기를 하나의 카드로 통합 -->
                     <div class="rounded-xl border border-slate-800 bg-navy-950 p-3 space-y-2">
                         <div class="flex items-center justify-between gap-2">
-                            <p class="text-xs font-bold text-slate-300">🎬 작은 영상 화면</p>
+                            <div id="yt-now-playing-card" class="hidden flex-1 items-center justify-between gap-3 min-w-0 py-1">
+                                <div class="flex items-center gap-2.5 min-w-0">
+                                    <span class="text-base shrink-0">🎶</span>
+                                    <div class="min-w-0">
+                                        <p id="yt-video-title" class="text-xs sm:text-sm font-bold text-white truncate">음원 정보를 불러오는 중...</p>
+                                        <p id="yt-video-channel" class="text-[11px] text-slate-400 truncate"></p>
+                                    </div>
+                                </div>
+                                <span id="yt-live-badge" class="text-[11px] font-bold px-2 py-0.5 rounded-md bg-slate-800 text-slate-400 shrink-0">대기</span>
+                            </div>
                             <a id="yt-open-original" href="https://www.youtube.com/" target="_blank" rel="noopener noreferrer"
-                               class="text-[11px] font-bold text-taxi-400 hover:text-orange-300 underline underline-offset-2 whitespace-nowrap">
+                               class="text-[11px] font-bold text-taxi-400 hover:text-orange-300 underline underline-offset-2 whitespace-nowrap shrink-0">
                                 유튜브에서 열기 ↗
                             </a>
                         </div>
@@ -361,7 +360,7 @@
                                 allowfullscreen
                             ></iframe>
                         </div>
-                        <p class="text-[10px] leading-relaxed text-slate-500">광고 건너뛰기는 유튜브가 건너뛰기를 허용했을 때 영상 화면 안에 표시됩니다. 표시되지 않는 광고를 강제로 넘길 수는 없습니다.</p>
+                        <p class="text-[10px] leading-relaxed text-slate-500">광고 건너뛰기는 유튜브가 허용했을 때 영상 화면 안에 표시됩니다.</p>
                     </div>
                 </div>
             </section>
