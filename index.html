@@ -103,7 +103,7 @@
                                 대기 중
                             </span>
                         </h1>
-                        <p class="text-xs text-taxi-400 font-medium">🚕 카카육 택시를 부르는 중...</p>
+                        <p class="text-xs text-taxi-400 font-medium">🚕 택시를 부르는 중...</p>
                 </div>
             </div>
 
@@ -267,6 +267,11 @@
                                 주행 중 재생
                             </button>
                         </div>
+                    </div>
+                    <div class="flex items-center gap-3 bg-navy-950 border border-slate-800 rounded-xl px-3.5 py-3">
+                        <span class="text-xs text-slate-400 whitespace-nowrap">🎵 음원 볼륨</span>
+                        <input id="yt-volume" type="range" min="0" max="100" value="60" aria-label="유튜브 음원 볼륨" class="w-full accent-taxi-500 cursor-pointer">
+                        <span id="yt-volume-value" class="text-xs text-slate-300 tabular-nums w-9 text-right">60%</span>
                     </div>
                     <p id="yt-helper-text" class="text-[11px] text-slate-500">
                         * 주행(공부) 중일 때만 유튜브 영상/노래를 재생할 수 있으며, 정차하거나 쉬는시간이 되면 자동으로 멈춥니다.
@@ -1405,6 +1410,8 @@
         const ytVideoChannel = document.getElementById('yt-video-channel');
         const ytLiveBadge = document.getElementById('yt-live-badge');
         const ytPlayerFrame = document.getElementById('yt-player-frame');
+        const ytVolumeSlider = document.getElementById('yt-volume');
+        const ytVolumeValue = document.getElementById('yt-volume-value');
         let isYoutubePlaying = false;
         let savedYoutubeTitle = '';
         let savedYoutubeChannel = '';
@@ -1464,6 +1471,24 @@
             }
             updateYoutubeMetaCard();
         }
+
+        function applyYoutubeVolume() {
+            const volume = Number(ytVolumeSlider.value);
+            ytVolumeValue.textContent = `${volume}%`;
+            if (ytPlayerFrame.contentWindow && ytPlayerFrame.src) {
+                ytPlayerFrame.contentWindow.postMessage(JSON.stringify({
+                    event: 'command',
+                    func: 'setVolume',
+                    args: [volume]
+                }), 'https://www.youtube.com');
+            }
+        }
+
+        ytVolumeSlider.addEventListener('input', applyYoutubeVolume);
+        ytPlayerFrame.addEventListener('load', () => {
+            // 플레이어가 준비될 시간을 두고 현재 설정된 볼륨을 적용
+            window.setTimeout(applyYoutubeVolume, 500);
+        });
 
         function stopYoutubePlayback() {
             isYoutubePlaying = false;
@@ -1582,6 +1607,7 @@
             renderHistoryView();
             updateYoutubeControlsState();
             updateYoutubeMetaCard();
+            applyYoutubeVolume();
         });
     </script>
 </body>
