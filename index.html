@@ -158,7 +158,7 @@
                                 대기 중
                             </span>
                         </h1>
-                        <p class="text-xs text-taxi-400 font-medium">🚕 콜 택시를 부르는 중...</p>
+                        <p class="text-xs text-taxi-400 font-medium">🚕 카카육 택시를 부르는 중...</p>
                 </div>
             </div>
 
@@ -342,14 +342,27 @@
                         </div>
                         <span id="yt-live-badge" class="text-[11px] font-bold px-2 py-0.5 rounded-md bg-slate-800 text-slate-400 shrink-0">대기</span>
                     </div>
-                    <!-- 영상 화면은 숨기고 실제 오디오 재생용 플레이어만 화면 밖에 배치 -->
-                    <iframe
-                        id="yt-player-frame"
-                        class="fixed -left-[9999px] top-0 w-48 h-36 opacity-0 border-0 pointer-events-none"
-                        src=""
-                        title="집중 음원 플레이어"
-                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                    ></iframe>
+                    <!-- 작은 유튜브 화면: 광고 건너뛰기는 유튜브가 공식 제공할 때 플레이어 안에서 가능합니다. -->
+                    <div class="rounded-xl border border-slate-800 bg-navy-950 p-3 space-y-2">
+                        <div class="flex items-center justify-between gap-2">
+                            <p class="text-xs font-bold text-slate-300">🎬 작은 영상 화면</p>
+                            <a id="yt-open-original" href="https://www.youtube.com/" target="_blank" rel="noopener noreferrer"
+                               class="text-[11px] font-bold text-taxi-400 hover:text-orange-300 underline underline-offset-2 whitespace-nowrap">
+                                유튜브에서 열기 ↗
+                            </a>
+                        </div>
+                        <div class="w-full flex justify-center">
+                            <iframe
+                                id="yt-player-frame"
+                                class="block w-full max-w-[280px] aspect-video rounded-lg border border-slate-700 bg-black"
+                                src=""
+                                title="집중 음원 및 유튜브 미리보기"
+                                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                                allowfullscreen
+                            ></iframe>
+                        </div>
+                        <p class="text-[10px] leading-relaxed text-slate-500">광고 건너뛰기는 유튜브가 건너뛰기를 허용했을 때 영상 화면 안에 표시됩니다. 표시되지 않는 광고를 강제로 넘길 수는 없습니다.</p>
+                    </div>
                 </div>
             </section>
 
@@ -1581,7 +1594,7 @@
             const expectedUrlPrefix = `https://www.youtube.com/embed/${savedYoutubeVideoId}`;
             if (!ytPlayerFrame.src || !ytPlayerFrame.src.startsWith(expectedUrlPrefix)) {
                 // 새 음원일 때만 iframe을 새로 불러옵니다. 같은 음원은 기존 재생 위치에서 이어집니다.
-                ytPlayerFrame.src = `${expectedUrlPrefix}?autoplay=1&playsinline=1&rel=0&enablejsapi=1&origin=${encodeURIComponent(window.location.origin)}`;
+                ytPlayerFrame.src = `${expectedUrlPrefix}?autoplay=1&playsinline=1&controls=1&rel=0&enablejsapi=1&origin=${encodeURIComponent(window.location.origin)}`;
             } else {
                 sendYoutubePlayerCommand('playVideo');
             }
@@ -1642,6 +1655,8 @@
             }
 
             savedYoutubeVideoId = videoId;
+            const ytOpenOriginal = document.getElementById('yt-open-original');
+            if (ytOpenOriginal) ytOpenOriginal.href = `https://www.youtube.com/watch?v=${videoId}`;
             try {
                 localStorage.setItem(STORAGE_KEYS.YOUTUBE_URL, rawUrl);
             } catch (err) {}
