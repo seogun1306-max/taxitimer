@@ -1542,16 +1542,26 @@
 
         ytVolumeSlider.addEventListener('input', applyYoutubeVolume);
         ytPlayerFrame.addEventListener('load', () => {
-            // 플레이어가 준비될 시간을 두고 현재 설정된 볼륨을 적용
-            window.setTimeout(applyYoutubeVolume, 500);
+            // 플레이어가 준비될 시간을 두고 현재 설정된 볼륨과 재생 상태를 적용
+            window.setTimeout(() => {
+                applyYoutubeVolume();
+                sendYoutubePlayerCommand(isYoutubePlaying ? 'playVideo' : 'pauseVideo');
+            }, 500);
         });
 
+        function sendYoutubePlayerCommand(func) {
+            if (!ytPlayerFrame.contentWindow || !ytPlayerFrame.src) return;
+            ytPlayerFrame.contentWindow.postMessage(JSON.stringify({
+                event: 'command',
+                func,
+                args: []
+            }), 'https://www.youtube.com');
+        }
+
         function stopYoutubePlayback() {
+            // iframe을 제거하지 않고 일시정지해야 재생 위치가 유지됩니다.
+            sendYoutubePlayerCommand('pauseVideo');
             isYoutubePlaying = false;
-            if (ytPlayerFrame.src) {
-                // 정차/쉬는시간 전환 시 iframe src를 비워 음원 재생을 중단
-                ytPlayerFrame.src = '';
-            }
             updateYoutubeControlsState();
             updateYoutubeMetaCard();
         }
@@ -1567,9 +1577,14 @@
                 return;
             }
 
-            // 일부 영상은 임베드 재생이 제한될 수 있으므로 playsinline + autoplay 파라미터로 재생 시도
-            ytPlayerFrame.src = `https://www.youtube.com/embed/${savedYoutubeVideoId}?autoplay=1&playsinline=1&rel=0&enablejsapi=1`;
             isYoutubePlaying = true;
+            const expectedUrlPrefix = `https://www.youtube.com/embed/${savedYoutubeVideoId}`;
+            if (!ytPlayerFrame.src || !ytPlayerFrame.src.startsWith(expectedUrlPrefix)) {
+                // 새 음원일 때만 iframe을 새로 불러옵니다. 같은 음원은 기존 재생 위치에서 이어집니다.
+                ytPlayerFrame.src = `${expectedUrlPrefix}?autoplay=1&playsinline=1&rel=0&enablejsapi=1&origin=${encodeURIComponent(window.location.origin)}`;
+            } else {
+                sendYoutubePlayerCommand('playVideo');
+            }
             updateYoutubeControlsState();
             updateYoutubeMetaCard();
         }
