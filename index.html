@@ -85,6 +85,50 @@
         .tab-panel-animate {
             animation: tab-fade-in 0.25s ease-out forwards;
         }
+        
+        /* 모바일 화면 최적화: 작은 화면에서도 버튼·입력창을 편하게 사용 */
+        @media (max-width: 640px) {
+            html { -webkit-text-size-adjust: 100%; }
+            body { min-width: 320px; padding-bottom: env(safe-area-inset-bottom); }
+            header { padding-top: env(safe-area-inset-top); }
+            header > div { padding-left: 12px; padding-right: 12px; }
+            main { padding: 16px 12px 28px !important; }
+            #view-home, #view-history, #view-settings { gap: 16px; }
+            #meter-card { padding: 18px 14px; border-radius: 22px; }
+            #meter-card .grid { padding: 14px; }
+            #main-timer-display { font-size: clamp(1.55rem, 7vw, 2.15rem); }
+            #fare-display { font-size: clamp(2rem, 10vw, 2.7rem); }
+            #top-timer-display { font-size: 0.95rem; }
+            .nav-pill-btn { min-height: 44px; padding: 10px 5px; gap: 4px; font-size: 11px; }
+            #tab-btn-home, #tab-btn-history, #tab-btn-settings { white-space: nowrap; }
+            #btn-start, #btn-pause, #btn-save-home, #btn-reset { min-height: 48px; padding: 12px 8px; font-size: 13px; }
+            section.bg-navy-900 { border-radius: 18px; }
+            #noise-volume, #yt-volume { min-height: 32px; touch-action: pan-x; }
+            #btn-noise-toggle, #btn-yt-apply, #btn-yt-toggle { min-height: 44px; }
+            #youtube-url-input { width: 100%; min-width: 0; min-height: 46px; font-size: 16px; }
+            #btn-yt-apply, #btn-yt-toggle { flex: 1 1 0; padding-left: 10px; padding-right: 10px; }
+            #yt-now-playing-card { align-items: flex-start; }
+            input, select, textarea, button { max-width: 100%; }
+            input[type="range"] { accent-color: #f97316; }
+            /* 긴 텍스트와 표가 화면 너비를 밀어내지 않도록 처리 */
+            #current-task-display { overflow-wrap: anywhere; white-space: normal; }
+            table { display: block; max-width: 100%; overflow-x: auto; }
+        }
+
+        @media (max-width: 380px) {
+            header > div { padding-left: 9px; padding-right: 9px; }
+            main { padding-left: 9px !important; padding-right: 9px !important; }
+            #status-badge { font-size: 10px; padding-left: 6px; padding-right: 6px; }
+            .nav-pill-btn { font-size: 10px; }
+            #meter-card { padding-left: 11px; padding-right: 11px; }
+            #btn-start, #btn-pause, #btn-save-home, #btn-reset { font-size: 12px; }
+        }
+
+        /* 터치 기기에서 hover 효과로 인한 오작동 방지 */
+        @media (hover: none) and (pointer: coarse) {
+            .nav-pill-btn:hover { transform: none; }
+            button { -webkit-tap-highlight-color: transparent; }
+        }
     </style>
 </head>
 <body class="bg-navy-950 text-slate-100 font-sans min-h-screen flex flex-col justify-between selection:bg-taxi-500 selection:text-white">
