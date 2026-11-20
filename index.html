@@ -1,0 +1,1588 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>택시 타이머 ⏱️</title>
+    <!-- Tailwind CSS 불러오기 -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts: Noto Sans KR & JetBrains Mono (숫자 표시용) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@600;800&family=Noto+Sans+KR:wght@400;500;700;900&display=swap" rel="stylesheet">
+    
+    <script>
+        // Tailwind 커스텀 설정 (주황색과 남색 테마)
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        navy: {
+                            800: '#1e293b',
+                            900: '#0f172a',
+                            950: '#090d16',
+                        },
+                        taxi: {
+                            400: '#fb923c',
+                            500: '#f97316',
+                            600: '#ea580c',
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['"Noto Sans KR"', 'sans-serif'],
+                        mono: ['"JetBrains Mono"', 'monospace'],
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        /* 커스텀 애니메이션 및 스크롤바 스타일 */
+        @keyframes pulse-border {
+            0%, 100% { border-color: rgba(249, 115, 22, 0.4); }
+            50% { border-color: rgba(249, 115, 22, 1); }
+        }
+        .running-meter {
+            animation: pulse-border 2s infinite;
+        }
+        
+        /* 택시 갓등 애니메이션 */
+        @keyframes taxi-glow {
+            0%, 100% { box-shadow: 0 0 10px #f97316, 0 0 20px #f97316; }
+            50% { box-shadow: 0 0 2px #f97316; }
+        }
+        .taxi-sign-active {
+            animation: taxi-glow 1.5s infinite;
+        }
+
+        /* 커스텀 체크박스 */
+        .custom-checkbox:checked {
+            background-color: #f97316;
+            border-color: #f97316;
+        }
+
+        /* 탭 전환 버튼 클릭 & 전환 애니메이션 */
+        .nav-pill-btn {
+            transition: transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1), color 0.25s ease;
+        }
+        .nav-pill-btn:hover {
+            transform: translateY(-1px);
+        }
+        .nav-pill-btn:active {
+            transform: scale(0.95) translateY(1px);
+        }
+
+        /* 상단 탭 슬라이딩 배경 인디케이터 */
+        .tab-slider-indicator {
+            transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        /* 탭 화면 전환 페이드 애니메이션 */
+        @keyframes tab-fade-in {
+            from { opacity: 0; transform: translateY(6px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .tab-panel-animate {
+            animation: tab-fade-in 0.25s ease-out forwards;
+        }
+    </style>
+</head>
+<body class="bg-navy-950 text-slate-100 font-sans min-h-screen flex flex-col justify-between selection:bg-taxi-500 selection:text-white">
+
+    <!-- 상단 고정 헤더 & 미니 타이머 바 -->
+    <header class="sticky top-0 z-50 bg-navy-900/95 backdrop-blur-md border-b border-slate-800 shadow-lg">
+        <div class="max-w-3xl mx-auto px-4 py-3 space-y-2.5">
+            <div class="flex items-center justify-between">
+                <!-- 로고 및 환영 문구 -->
+                <div class="flex items-center gap-2.5">
+                    <span class="text-2xl sm:text-3xl" role="img" aria-label="타이머">⏱️</span>
+                    <div>
+                        <h1 class="font-black text-lg sm:text-xl tracking-tight text-white flex items-center gap-2">
+                            택시 타이머
+                            <span id="status-badge" class="text-xs font-bold px-2 py-0.5 rounded-full bg-slate-800 text-taxi-400 border border-taxi-500/30">
+                                대기 중
+                            </span>
+                        </h1>
+                        <p class="text-xs text-taxi-400 font-medium">🚕 카카육 택시를 부르는 중...</p>
+                </div>
+            </div>
+
+            <div class="flex items-center gap-2">
+                <!-- 화면 상단 실시간 타이머 표시 -->
+                <div class="flex items-center gap-3 bg-navy-950 px-3.5 py-1.5 rounded-xl border border-slate-800">
+                    <div class="text-right">
+                        <span class="block text-[10px] text-slate-400 uppercase tracking-wider">주행 시간</span>
+                        <span id="top-timer-display" class="font-mono font-bold text-base sm:text-lg text-taxi-400">00:00:00</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 상단 전환 버튼 3개 (기본화면 / 집중기록 / 설정 + 슬라이딩 애니메이션) -->
+            <div class="relative grid grid-cols-3 gap-1.5 bg-navy-950 p-1.5 rounded-2xl border border-slate-800">
+                <div id="tab-slider-bg" class="tab-slider-indicator absolute top-1.5 bottom-1.5 left-1.5 w-[calc(33.333%-0.5rem)] rounded-xl bg-taxi-500 shadow-md shadow-taxi-500/25 pointer-events-none"></div>
+
+                <button id="tab-btn-home" type="button" class="nav-pill-btn relative z-10 flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl font-bold text-xs sm:text-sm text-white cursor-pointer">
+                    <span>🚕</span>
+                    <span>기본화면</span>
+                </button>
+                <button id="tab-btn-history" type="button" class="nav-pill-btn relative z-10 flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl font-bold text-xs sm:text-sm text-slate-400 hover:text-slate-200 cursor-pointer">
+                    <span>📊</span>
+                    <span>집중기록</span>
+                </button>
+                <button id="tab-btn-settings" type="button" class="nav-pill-btn relative z-10 flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl font-bold text-xs sm:text-sm text-slate-400 hover:text-slate-200 cursor-pointer">
+                    <span>⚙️</span>
+                    <span>설정</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- 메인 콘텐츠 영역 -->
+    <main class="flex-grow max-w-3xl w-full mx-auto px-4 py-6">
+
+        <!-- [화면 1] 기본화면 -->
+        <div id="view-home" class="space-y-6 tab-panel-animate">
+            <!-- 앱 목적 및 사용 방법 한 문장 안내 -->
+            <section class="bg-navy-900 border border-slate-800 rounded-2xl p-4 text-center shadow-md">
+                <p class="text-sm sm:text-base text-slate-200 font-medium">
+                    💡 <span class="text-taxi-400 font-bold">공부할 과목을 선택</span>하고 <span class="text-taxi-400 font-bold">탑승</span>하면, 30초마다 100원씩 쌓이는 <span class="text-taxi-400 font-bold">가상 집중 미터기</span>와 백색소음으로 목표 달성을 도와줍니다!
+                </p>
+            </section>
+
+            <!-- 택시 미터기(타이머 & 점수) 메인 카드 -->
+            <section id="meter-card" class="bg-gradient-to-b from-navy-800 to-navy-900 border-2 border-slate-700 rounded-3xl p-6 sm:p-8 shadow-2xl relative overflow-hidden transition-all">
+                <!-- 상단 택시 표시등 장식 -->
+                <div class="flex justify-center mb-4">
+                    <div id="taxi-cap" class="px-4 py-1 rounded-full bg-slate-800 border border-slate-600 text-xs font-black tracking-widest text-slate-400 transition-all">
+                        TAXI • 빈차
+                    </div>
+                </div>
+
+                <!-- 현재 선택된 공부 항목 또는 쉬는시간 안내 표시 -->
+                <div class="text-center mb-6 space-y-2.5">
+                    <span class="text-xs text-slate-400 block">현재 탑승(공부) 중인 목적지</span>
+                    <div id="current-task-display" class="inline-block bg-navy-950/80 border border-taxi-500/40 text-taxi-400 font-bold text-base sm:text-lg px-4 py-1.5 rounded-xl max-w-full truncate">
+                        아래 입력창에서 공부할 목적지를 추가해주세요!
+                    </div>
+
+                    <!-- 쉬는시간(신호 정차) 카운트다운 및 스킵 바 -->
+                    <div id="break-banner" class="hidden flex-col sm:flex-row items-center justify-center gap-2.5 bg-amber-500/10 border border-amber-500/40 rounded-xl px-4 py-2.5 max-w-md mx-auto">
+                        <div class="flex items-center gap-1.5 text-amber-300 text-xs sm:text-sm font-bold">
+                            <span>🚦 남은 쉬는시간:</span>
+                            <span id="break-timer-display" class="font-mono text-base text-white">05:00</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 미터기 숫자 디스플레이 (30초당 +100원) -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-navy-950 p-5 rounded-2xl border border-slate-800 mb-6">
+                    <!-- 누적 집중 요금(점수) -->
+                    <div class="flex flex-col items-center sm:items-start justify-center border-b sm:border-b-0 sm:border-r border-slate-800 pb-4 sm:pb-0 sm:pr-4">
+                        <div class="flex items-center gap-1.5 text-slate-400 text-xs font-medium mb-1">
+                            <span>🏆 가상 집중 미터기</span>
+                            <span class="text-[11px] bg-slate-800 text-slate-300 px-1.5 py-0.5 rounded">30초당 +100원</span>
+                        </div>
+                        <div class="flex items-baseline gap-1">
+                            <span id="fare-display" class="font-mono font-extrabold text-4xl sm:text-5xl text-taxi-500 tracking-tight">0</span>
+                            <span class="text-lg font-bold text-slate-300">원</span>
+                        </div>
+                        <span class="text-[11px] text-slate-500 mt-1">* 실제 현금이 아닌 학습 성취도 기록용 가상 요금입니다.</span>
+                    </div>
+
+                    <!-- 경과 시간 -->
+                    <div class="flex flex-col items-center sm:items-end justify-center pt-2 sm:pt-0 sm:pl-4">
+                        <span class="text-slate-400 text-xs font-medium mb-1">⏱️ 총 집중 시간</span>
+                        <div id="main-timer-display" class="font-mono font-extrabold text-3xl sm:text-4xl text-white tracking-wider">
+                            00:00:00
+                        </div>
+                        <!-- 다음 100원 추가까지 남은 게이지 바 (30초 주기) -->
+                        <div class="w-full max-w-[180px] bg-slate-800 h-1.5 rounded-full mt-2 overflow-hidden">
+                            <div id="interval-progress-bar" class="bg-taxi-500 h-full w-0 transition-all duration-300"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 타이머 컨트롤 버튼 (탑승, 정차/출발, 지불, 초기화) -->
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    <button id="btn-start" type="button" class="flex items-center justify-center gap-1.5 bg-taxi-500 hover:bg-taxi-600 active:scale-95 text-white font-bold py-3.5 px-4 rounded-xl shadow-lg shadow-taxi-500/20 transition-all cursor-pointer">
+                        <span>🚕</span>
+                        <span>탑승</span>
+                    </button>
+                    <button id="btn-pause" type="button" class="flex items-center justify-center gap-1.5 bg-slate-700 hover:bg-slate-600 active:scale-95 text-white font-bold py-3.5 px-4 rounded-xl transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed" disabled>
+                        <span>🛑</span>
+                        <span>정차</span>
+                    </button>
+                    <button id="btn-save-home" type="button" class="flex items-center justify-center gap-1.5 bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white font-bold py-3.5 px-4 rounded-xl shadow-lg shadow-emerald-600/20 transition-all cursor-pointer">
+                        <span>💳</span>
+                        <span>지불</span>
+                    </button>
+                    <button id="btn-reset" type="button" class="flex items-center justify-center gap-1.5 bg-navy-950 hover:bg-slate-800 border border-slate-700 active:scale-95 text-slate-300 font-bold py-3.5 px-4 rounded-xl transition-all cursor-pointer">
+                        <span>🔄</span>
+                        <span>초기화</span>
+                    </button>
+                </div>
+            </section>
+
+            <!-- 백색소음(화이트 노이즈) 컨트롤 패널 -->
+            <section class="bg-navy-900 border border-slate-800 rounded-2xl p-5 shadow-lg">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div class="flex items-center gap-3">
+                        <div id="noise-icon-box" class="w-11 h-11 rounded-xl bg-slate-800 flex items-center justify-center text-xl transition-colors">
+                            🎧
+                        </div>
+                        <div>
+                            <h2 class="font-bold text-base text-white flex items-center gap-2">
+                                집중 백색소음 (빗소리/백색음)
+                                <span id="noise-status-text" class="text-xs font-normal text-slate-400">꺼짐</span>
+                            </h2>
+                            <p class="text-xs text-slate-400">주행 중에만 켤 수 있으며 주변 소음을 덮어주는 부드러운 사운드를 재생합니다.</p>
+                        </div>
+                    </div>
+
+                    <div class="flex items-center gap-3 self-end sm:self-center w-full sm:w-auto justify-end">
+                        <div class="flex items-center gap-2 bg-navy-950 px-3 py-2 rounded-xl border border-slate-800 flex-grow sm:flex-grow-0">
+                            <span class="text-xs text-slate-400">🔉</span>
+                            <input id="noise-volume" type="range" min="0" max="100" value="40" aria-label="백색소음 볼륨" class="w-full sm:w-24 accent-taxi-500 cursor-pointer">
+                        </div>
+                        <button id="btn-noise-toggle" type="button" disabled class="px-4 py-2.5 rounded-xl font-bold text-sm bg-slate-800 text-slate-500 border border-slate-700 transition-all opacity-50 cursor-not-allowed whitespace-nowrap">
+                            주행 중 가능
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 유튜브 링크 연결 및 주행 중 재생 영역 -->
+                <div class="mt-4 pt-4 border-t border-slate-800/80 space-y-3">
+                    <div class="flex flex-col sm:flex-row gap-2">
+                        <input
+                            id="youtube-url-input"
+                            type="url"
+                            placeholder="유튜브 링크 입력 (예: https://youtu.be/... 또는 https://www.youtube.com/watch?v=...)"
+                            class="flex-grow bg-navy-950 border border-slate-700 focus:border-taxi-500 focus:outline-none rounded-xl px-3.5 py-2.5 text-xs sm:text-sm text-white placeholder-slate-500 transition-colors"
+                        >
+                        <div class="flex gap-2 shrink-0">
+                            <button id="btn-yt-apply" type="button" class="bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-bold px-3.5 py-2.5 rounded-xl text-xs sm:text-sm transition-colors cursor-pointer">
+                                링크 적용
+                            </button>
+                            <button id="btn-yt-toggle" type="button" disabled class="px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm bg-slate-800 text-slate-500 border border-slate-700 transition-all opacity-50 cursor-not-allowed whitespace-nowrap">
+                                주행 중 재생
+                            </button>
+                        </div>
+                    </div>
+                    <p id="yt-helper-text" class="text-[11px] text-slate-500">
+                        * 주행(공부) 중일 때만 유튜브 영상/노래를 재생할 수 있으며, 정차하거나 쉬는시간이 되면 자동으로 멈춥니다.
+                    </p>
+                    <div id="yt-now-playing-card" class="hidden items-center justify-between gap-3 bg-navy-950 border border-slate-800 rounded-xl px-3.5 py-2.5">
+                        <div class="flex items-center gap-2.5 min-w-0">
+                            <span class="text-base shrink-0">🎶</span>
+                            <div class="min-w-0">
+                                <p id="yt-video-title" class="text-xs sm:text-sm font-bold text-white truncate">음원 정보를 불러오는 중...</p>
+                                <p id="yt-video-channel" class="text-[11px] text-slate-400 truncate"></p>
+                            </div>
+                        </div>
+                        <span id="yt-live-badge" class="text-[11px] font-bold px-2 py-0.5 rounded-md bg-slate-800 text-slate-400 shrink-0">대기</span>
+                    </div>
+                    <!-- 영상 화면은 숨기고 실제 오디오 재생용 플레이어만 화면 밖에 배치 -->
+                    <iframe
+                        id="yt-player-frame"
+                        class="fixed -left-[9999px] top-0 w-48 h-36 opacity-0 border-0 pointer-events-none"
+                        src=""
+                        title="집중 음원 플레이어"
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                    ></iframe>
+                </div>
+            </section>
+
+            <!-- 공부할 항목(목적지) 리스트 섹션 -->
+            <section class="bg-navy-900 border border-slate-800 rounded-2xl p-5 sm:p-6 shadow-lg space-y-4">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h2 class="font-bold text-lg text-white">📍 공부 목적지 (할 일 목록)</h2>
+                        <p class="text-xs text-slate-400 mt-0.5">목적지를 선택해야 탑승할 수 있으며, 완료된 항목은 선택할 수 없습니다.</p>
+                    </div>
+                    <div class="bg-navy-950 border border-slate-800 px-3 py-1.5 rounded-xl text-xs font-bold">
+                        완료 <span id="completed-count" class="text-taxi-400">0</span> / <span id="total-count">0</span>
+                    </div>
+                </div>
+
+                <!-- 새 공부 항목 추가 폼 -->
+                <form id="task-form" class="flex gap-2">
+                    <input 
+                        type="text" 
+                        id="task-input" 
+                        maxlength="40"
+                        placeholder="예: 수학 문제집 2단원 풀기" 
+                        class="flex-grow bg-navy-950 border border-slate-700 focus:border-taxi-500 focus:outline-none rounded-xl px-4 py-3 text-sm text-white placeholder-slate-500 transition-colors"
+                        required
+                    >
+                    <button type="submit" class="bg-taxi-500 hover:bg-taxi-600 active:scale-95 text-white font-bold px-5 py-3 rounded-xl text-sm transition-all cursor-pointer whitespace-nowrap">
+                        + 추가
+                    </button>
+                </form>
+
+                <!-- 항목 리스트가 렌더링될 영역 -->
+                <ul id="task-list" class="space-y-2.5 pt-1"></ul>
+            </section>
+        </div>
+
+        <!-- [화면 2] 집중기록 화면 -->
+        <div id="view-history" class="hidden space-y-6 tab-panel-animate">
+            <!-- 요약 통계 카드 3종 -->
+            <section class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div class="bg-navy-900 border border-slate-800 rounded-2xl p-5 text-center shadow-md">
+                    <span class="text-xs text-slate-400 block mb-1">⏱️ 누적 집중 시간</span>
+                    <span id="history-total-time" class="font-mono font-extrabold text-2xl text-white">00:00:00</span>
+                </div>
+                <div class="bg-navy-900 border border-slate-800 rounded-2xl p-5 text-center shadow-md">
+                    <span class="text-xs text-slate-400 block mb-1">🏆 총 집중 점수</span>
+                    <span id="history-total-score" class="font-mono font-extrabold text-2xl text-taxi-400">0점</span>
+                </div>
+                <div class="bg-navy-900 border border-slate-800 rounded-2xl p-5 text-center shadow-md">
+                    <span class="text-xs text-slate-400 block mb-1">✅ 완료한 목적지</span>
+                    <span id="history-completed-tasks" class="font-mono font-extrabold text-2xl text-emerald-400">0개</span>
+                </div>
+            </section>
+
+            <!-- 저장된 주행(집중) 로그 내역 -->
+            <section class="bg-navy-900 border border-slate-800 rounded-2xl p-5 sm:p-6 shadow-lg space-y-4">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h2 class="font-bold text-lg text-white">📜 저장된 집중 주행 일지</h2>
+                        <p class="text-xs text-slate-400 mt-0.5">기본화면에서 <span class="text-emerald-400 font-semibold">지불</span> 버튼을 누르면 이곳에 누적 저장됩니다.</p>
+                    </div>
+                    <button id="btn-clear-logs" type="button" class="text-xs text-slate-400 hover:text-rose-400 px-2.5 py-1.5 rounded-lg hover:bg-slate-800 transition-colors cursor-pointer">
+                        기록 비우기
+                    </button>
+                </div>
+
+                <ul id="study-log-list" class="space-y-2.5"></ul>
+            </section>
+
+            <!-- 완료한 공부 목적지 요약 -->
+            <section class="bg-navy-900 border border-slate-800 rounded-2xl p-5 sm:p-6 shadow-lg space-y-3">
+                <h2 class="font-bold text-lg text-white">🏁 도착 완료한 공부 목적지</h2>
+                <ul id="completed-task-history-list" class="space-y-2"></ul>
+            </section>
+        </div>
+
+        <!-- [화면 3] 설정 화면 -->
+        <div id="view-settings" class="hidden space-y-6 tab-panel-animate">
+            <section class="bg-navy-900 border border-slate-800 rounded-2xl p-5 sm:p-6 shadow-lg space-y-5">
+                <div class="flex items-center gap-2.5 border-b border-slate-800 pb-4">
+                    <span class="text-2xl">⚙️</span>
+                    <div>
+                        <h2 class="font-bold text-lg text-white">주행 & 쉬는시간 설정</h2>
+                        <p class="text-xs text-slate-400 mt-0.5">원하는 집중 주기와 쉬는시간 길이를 자유롭게 조절할 수 있습니다.</p>
+                    </div>
+                </div>
+
+                <form id="settings-form" class="space-y-5">
+                    <div class="bg-navy-950 border border-slate-800 rounded-2xl p-4 space-y-2">
+                        <label for="input-study-cycle" class="block text-sm font-bold text-slate-200">
+                            🚕 신호 정차(쉬는시간) 주기
+                        </label>
+                        <div class="flex items-center gap-2.5">
+                            <input id="input-study-cycle" type="number" min="1" max="180" value="20" required class="w-full bg-navy-900 border border-slate-700 focus:border-taxi-500 focus:outline-none rounded-xl px-4 py-3 text-base font-mono font-bold text-white">
+                            <span class="text-sm font-bold text-slate-300 shrink-0">분마다</span>
+                        </div>
+                        <p class="text-xs text-slate-500">기본값은 20분입니다. (1~180분 설정 가능)</p>
+                    </div>
+
+                    <div class="bg-navy-950 border border-slate-800 rounded-2xl p-4 space-y-2">
+                        <label for="input-break-duration" class="block text-sm font-bold text-slate-200">
+                            🚦 쉬는시간 길이
+                        </label>
+                        <div class="flex items-center gap-2.5">
+                            <input id="input-break-duration" type="number" min="1" max="60" value="5" required class="w-full bg-navy-900 border border-slate-700 focus:border-taxi-500 focus:outline-none rounded-xl px-4 py-3 text-base font-mono font-bold text-white">
+                            <span class="text-sm font-bold text-slate-300 shrink-0">분 휴식</span>
+                        </div>
+                        <p class="text-xs text-slate-500">기본값은 5분입니다. (1~60분 설정 가능)</p>
+                    </div>
+
+                    <div class="flex justify-end gap-2 pt-2">
+                        <button id="btn-reset-settings" type="button" class="px-4 py-3 rounded-xl text-sm font-bold bg-slate-800 hover:bg-slate-700 text-slate-300 cursor-pointer transition-colors">
+                            기본값 복원 (20분/5분)
+                        </button>
+                        <button type="submit" class="px-5 py-3 rounded-xl text-sm font-bold bg-taxi-500 hover:bg-taxi-600 text-white shadow-lg shadow-taxi-500/20 cursor-pointer transition-all">
+                            💾 설정 저장
+                        </button>
+                    </div>
+                </form>
+            </section>
+        </div>
+
+        <!-- 커스텀 알림/확인 메시지 모달 (alert/confirm 대체용) -->
+        <div id="custom-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+            <div class="bg-navy-900 border border-slate-700 rounded-2xl max-w-sm w-full p-6 shadow-2xl space-y-4 transform transition-all">
+                <div class="flex items-center gap-2 text-taxi-400 font-bold text-lg">
+                    <span>⏱️</span>
+                    <h3 id="modal-title">알림</h3>
+                </div>
+                <p id="modal-message" class="text-sm text-slate-300 leading-relaxed"></p>
+                <div id="modal-buttons" class="flex justify-end gap-2 pt-2">
+                    <button id="modal-cancel-btn" type="button" class="px-4 py-2 rounded-xl text-sm font-bold bg-slate-800 hover:bg-slate-700 text-slate-300 cursor-pointer">취소</button>
+                    <button id="modal-confirm-btn" type="button" class="px-4 py-2 rounded-xl text-sm font-bold bg-taxi-500 hover:bg-taxi-600 text-white cursor-pointer">확인</button>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- 하단 푸터 (개인정보 보호 안내) -->
+    <footer class="bg-navy-900 border-t border-slate-800 py-5 px-4 mt-8">
+        <div class="max-w-3xl mx-auto text-center space-y-1.5 text-xs text-slate-400">
+            <p class="font-medium text-slate-300">🛡️ 안심하고 사용하는 집중 도우미 · 택시 타이머</p>
+            <p>본 웹앱은 서버 전송 없이 사용자 기기의 브라우저(로컬 저장소)에만 학습 목록과 시간을 안전하게 보관하며, 개인정보를 수집하지 않습니다.</p>
+        </div>
+    </footer>
+
+    <script>
+        /**
+         * 택시 타이머 웹앱 핵심 로직
+         * 1. 타이머 및 가상 집중 점수 계산 (30초당 100점 추가)
+         * 2. 공부 목록 관리 (초기 기본값 빈 배열, localStorage 자동 저장/불러오기)
+         * 3. Web Audio API를 활용한 순수 브라우저 내장 백색소음
+         */
+
+        // --- 로컬 저장소(localStorage) 키 상수 ---
+        const STORAGE_KEYS = {
+            TASKS: 'taxi_timer_tasks_v1',
+            SELECTED_ID: 'taxi_timer_selected_id_v1',
+            ELAPSED_SECONDS: 'taxi_timer_elapsed_seconds_v1',
+            STUDY_LOGS: 'taxi_timer_study_logs_v1',
+            YOUTUBE_URL: 'taxi_timer_youtube_url_v1'
+        };
+
+        // --- 상태 변수 초기화 ---
+        let elapsedSeconds = 0;       // 총 경과 시간(초)
+        let studyStreakSeconds = 0;   // 연속 주행 시간(초)
+        let timerInterval = null;     // setInterval 참조
+        let isRunning = false;        // 타이머 작동 여부
+        let isBreakTime = false;      // 쉬는시간(신호 정차) 여부
+        let breakRemainingSeconds = 0;// 쉬는시간 남은 초
+        let breakInterval = null;     // 쉬는시간 타이머 참조
+        let activeTab = 'home';       // 현재 활성화된 탭 ('home' | 'history')
+        let savedYoutubeVideoId = ''; // 저장된 유튜브 영상 ID
+
+        // 실제 시계(Date.now) 기반 정밀 시간 측정을 위한 기준점 변수
+        let runStartTimestamp = 0;
+        let baseElapsedSeconds = 0;
+        let baseStreakSeconds = 0;
+        let breakEndTimestamp = 0;
+
+        let studyCycleMinutes = 20;   // 기본 20분 주기
+        let breakDurationMinutes = 5; // 기본 5분 쉬는시간
+        let STUDY_CYCLE_SECONDS = studyCycleMinutes * 60;
+        let BREAK_DURATION_SECONDS = breakDurationMinutes * 60;
+
+        // 기본값은 아무것도 없는 빈 배열로 시작
+        let tasks = [];
+        let selectedTaskId = null;
+        let studyLogs = [];           // 저장된 집중 기록 리스트
+
+        // --- 로컬 저장소 저장 및 불러오기 함수 ---
+        function saveTasksToStorage() {
+            try {
+                localStorage.setItem(STORAGE_KEYS.TASKS, JSON.stringify(tasks));
+                if (selectedTaskId !== null) {
+                    localStorage.setItem(STORAGE_KEYS.SELECTED_ID, String(selectedTaskId));
+                } else {
+                    localStorage.removeItem(STORAGE_KEYS.SELECTED_ID);
+                }
+            } catch (e) {
+                console.warn('목록 저장 실패:', e);
+            }
+        }
+
+        function saveTimerToStorage() {
+            try {
+                localStorage.setItem(STORAGE_KEYS.ELAPSED_SECONDS, String(elapsedSeconds));
+            } catch (e) {
+                console.warn('타이머 저장 실패:', e);
+            }
+        }
+
+        function saveLogsToStorage() {
+            try {
+                localStorage.setItem(STORAGE_KEYS.STUDY_LOGS, JSON.stringify(studyLogs));
+            } catch (e) {
+                console.warn('집중기록 저장 실패:', e);
+            }
+        }
+
+        function saveSettingsToStorage() {
+            try {
+                localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify({
+                    studyCycleMinutes,
+                    breakDurationMinutes
+                }));
+            } catch (e) {
+                console.warn('설정 저장 실패:', e);
+            }
+        }
+
+        function loadFromStorage() {
+            try {
+                const savedTasks = localStorage.getItem(STORAGE_KEYS.TASKS);
+                if (savedTasks) {
+                    const parsed = JSON.parse(savedTasks);
+                    if (Array.isArray(parsed)) {
+                        tasks = parsed;
+                    }
+                }
+
+                const savedSelectedId = localStorage.getItem(STORAGE_KEYS.SELECTED_ID);
+                if (savedSelectedId !== null) {
+                    const numId = Number(savedSelectedId);
+                    if (!Number.isNaN(numId)) {
+                        selectedTaskId = numId;
+                    }
+                }
+
+                const savedSeconds = localStorage.getItem(STORAGE_KEYS.ELAPSED_SECONDS);
+                if (savedSeconds !== null) {
+                    const numSec = parseInt(savedSeconds, 10);
+                    if (!Number.isNaN(numSec) && numSec >= 0) {
+                        elapsedSeconds = numSec;
+                    }
+                }
+
+                const savedLogs = localStorage.getItem(STORAGE_KEYS.STUDY_LOGS);
+                if (savedLogs) {
+                    const parsedLogs = JSON.parse(savedLogs);
+                    if (Array.isArray(parsedLogs)) {
+                        studyLogs = parsedLogs;
+                    }
+                }
+
+                const savedSettings = localStorage.getItem(STORAGE_KEYS.SETTINGS);
+                if (savedSettings) {
+                    const parsedSettings = JSON.parse(savedSettings);
+                    if (parsedSettings && typeof parsedSettings.studyCycleMinutes === 'number' && parsedSettings.studyCycleMinutes >= 1) {
+                        studyCycleMinutes = parsedSettings.studyCycleMinutes;
+                        STUDY_CYCLE_SECONDS = studyCycleMinutes * 60;
+                    }
+                    if (parsedSettings && typeof parsedSettings.breakDurationMinutes === 'number' && parsedSettings.breakDurationMinutes >= 1) {
+                        breakDurationMinutes = parsedSettings.breakDurationMinutes;
+                        BREAK_DURATION_SECONDS = breakDurationMinutes * 60;
+                    }
+                }
+
+                const savedYtUrl = localStorage.getItem(STORAGE_KEYS.YOUTUBE_URL);
+                if (savedYtUrl) {
+                    const extractedId = extractYoutubeVideoId(savedYtUrl);
+                    if (extractedId) {
+                        savedYoutubeVideoId = extractedId;
+                    }
+                }
+            } catch (e) {
+                console.warn('로컬 저장소 불러오기 실패:', e);
+            }
+        }
+
+        // --- DOM 요소 참조 ---
+        const tabBtnHome = document.getElementById('tab-btn-home');
+        const tabBtnHistory = document.getElementById('tab-btn-history');
+        const tabBtnSettings = document.getElementById('tab-btn-settings');
+        const tabSliderBg = document.getElementById('tab-slider-bg');
+        const viewHome = document.getElementById('view-home');
+        const viewHistory = document.getElementById('view-history');
+        const viewSettings = document.getElementById('view-settings');
+
+        const topTimerDisplay = document.getElementById('top-timer-display');
+        const mainTimerDisplay = document.getElementById('main-timer-display');
+        const fareDisplay = document.getElementById('fare-display');
+        const intervalProgressBar = document.getElementById('interval-progress-bar');
+        const statusBadge = document.getElementById('status-badge');
+        const taxiCap = document.getElementById('taxi-cap');
+        const meterCard = document.getElementById('meter-card');
+        const currentTaskDisplay = document.getElementById('current-task-display');
+        const breakBanner = document.getElementById('break-banner');
+        const breakTimerDisplay = document.getElementById('break-timer-display');
+
+        const btnStart = document.getElementById('btn-start');
+        const btnPause = document.getElementById('btn-pause');
+        const btnSaveHome = document.getElementById('btn-save-home');
+        const btnReset = document.getElementById('btn-reset');
+
+        const taskForm = document.getElementById('task-form');
+        const taskInput = document.getElementById('task-input');
+        const taskListEl = document.getElementById('task-list');
+        const completedCountEl = document.getElementById('completed-count');
+        const totalCountEl = document.getElementById('total-count');
+
+        // 집중기록 뷰 요소
+        const historyTotalTime = document.getElementById('history-total-time');
+        const historyTotalScore = document.getElementById('history-total-score');
+        const historyCompletedTasks = document.getElementById('history-completed-tasks');
+        const btnClearLogs = document.getElementById('btn-clear-logs');
+        const studyLogList = document.getElementById('study-log-list');
+        const completedTaskHistoryList = document.getElementById('completed-task-history-list');
+
+        // 모달 요소
+        const customModal = document.getElementById('custom-modal');
+        const modalTitle = document.getElementById('modal-title');
+        const modalMessage = document.getElementById('modal-message');
+        let modalCancelBtn = document.getElementById('modal-cancel-btn');
+        let modalConfirmBtn = document.getElementById('modal-confirm-btn');
+
+        // 설정 폼 요소
+        const settingsForm = document.getElementById('settings-form');
+        const btnResetSettings = document.getElementById('btn-reset-settings');
+        const inputStudyCycle = document.getElementById('input-study-cycle');
+        const inputBreakDuration = document.getElementById('input-break-duration');
+
+        // --- 설정 폼 동기화 및 저장 제어 ---
+        function syncSettingsInputs() {
+            inputStudyCycle.value = studyCycleMinutes;
+            inputBreakDuration.value = breakDurationMinutes;
+        }
+
+        btnResetSettings.addEventListener('click', () => {
+            studyCycleMinutes = 20;
+            breakDurationMinutes = 5;
+            STUDY_CYCLE_SECONDS = studyCycleMinutes * 60;
+            BREAK_DURATION_SECONDS = breakDurationMinutes * 60;
+            syncSettingsInputs();
+            saveSettingsToStorage();
+            showModal('기본값 복원 완료 ⚙️', '쉬는시간 주기가 기본값(20분 주행 / 5분 휴식)으로 복원되었습니다.');
+        });
+
+        settingsForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const newCycle = Math.min(180, Math.max(1, parseInt(inputStudyCycle.value, 10) || 20));
+            const newBreak = Math.min(60, Math.max(1, parseInt(inputBreakDuration.value, 10) || 5));
+
+            studyCycleMinutes = newCycle;
+            breakDurationMinutes = newBreak;
+            STUDY_CYCLE_SECONDS = studyCycleMinutes * 60;
+            BREAK_DURATION_SECONDS = breakDurationMinutes * 60;
+
+            saveSettingsToStorage();
+            showModal('설정 저장 완료 ⚙️', `이제 ${studyCycleMinutes}분 주행마다 ${breakDurationMinutes}분 쉬는시간(신호 정차)이 적용됩니다.`);
+        });
+
+        // --- 유틸리티 함수: 모달 창 띄우기 (alert/confirm 대체) ---
+        function showModal(title, message, isConfirm = false, onConfirm = null) {
+            modalTitle.textContent = title;
+            modalMessage.textContent = message;
+            
+            if (isConfirm) {
+                modalCancelBtn.classList.remove('hidden');
+            } else {
+                modalCancelBtn.classList.add('hidden');
+            }
+
+            customModal.classList.remove('hidden');
+            customModal.classList.add('flex');
+
+            const newConfirmBtn = modalConfirmBtn.cloneNode(true);
+            modalConfirmBtn.replaceWith(newConfirmBtn);
+            modalConfirmBtn = newConfirmBtn;
+            
+            const newCancelBtn = modalCancelBtn.cloneNode(true);
+            modalCancelBtn.replaceWith(newCancelBtn);
+            modalCancelBtn = newCancelBtn;
+
+            modalConfirmBtn.addEventListener('click', () => {
+                closeModal();
+                if (onConfirm) onConfirm();
+            });
+
+            modalCancelBtn.addEventListener('click', () => {
+                closeModal();
+            });
+        }
+
+        function closeModal() {
+            customModal.classList.add('hidden');
+            customModal.classList.remove('flex');
+        }
+
+        // --- 시간 포맷팅 (HH:MM:SS) ---
+        function formatTime(totalSec) {
+            const hrs = Math.floor(totalSec / 3600);
+            const mins = Math.floor((totalSec % 3600) / 60);
+            const secs = totalSec % 60;
+            return [
+                String(hrs).padStart(2, '0'),
+                String(mins).padStart(2, '0'),
+                String(secs).padStart(2, '0')
+            ].join(':');
+        }
+
+        // --- 상단 탭 전환 기능 ---
+        function switchTab(tab) {
+            activeTab = tab;
+            const inactiveBtnClass = 'nav-pill-btn relative z-10 flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl font-bold text-xs sm:text-sm text-slate-400 hover:text-slate-200 cursor-pointer';
+            const activeBtnClass = 'nav-pill-btn relative z-10 flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl font-bold text-xs sm:text-sm text-white cursor-pointer';
+
+            tabBtnHome.className = inactiveBtnClass;
+            tabBtnHistory.className = inactiveBtnClass;
+            tabBtnSettings.className = inactiveBtnClass;
+
+            viewHome.classList.add('hidden');
+            viewHistory.classList.add('hidden');
+            viewSettings.classList.add('hidden');
+
+            if (tab === 'home') {
+                tabSliderBg.style.transform = 'translateX(0%)';
+                tabBtnHome.className = activeBtnClass;
+                viewHome.classList.remove('hidden');
+            } else if (tab === 'history') {
+                tabSliderBg.style.transform = 'translateX(calc(100% + 0.375rem))';
+                tabBtnHistory.className = activeBtnClass;
+                viewHistory.classList.remove('hidden');
+                renderHistoryView();
+            } else if (tab === 'settings') {
+                tabSliderBg.style.transform = 'translateX(calc(200% + 0.75rem))';
+                tabBtnSettings.className = activeBtnClass;
+                viewSettings.classList.remove('hidden');
+                syncSettingsInputs();
+            }
+        }
+
+        tabBtnHome.addEventListener('click', () => switchTab('home'));
+        tabBtnHistory.addEventListener('click', () => switchTab('history'));
+        tabBtnSettings.addEventListener('click', () => switchTab('settings'));
+
+        // --- 타이머 및 미터기 화면 업데이트 (30초마다 100원 추가) ---
+        function updateTimerUI() {
+            const formatted = formatTime(elapsedSeconds);
+            topTimerDisplay.textContent = formatted;
+            mainTimerDisplay.textContent = formatted;
+
+            const completedUnits = Math.floor(elapsedSeconds / 30);
+            const currentFare = completedUnits * 100;
+            fareDisplay.textContent = currentFare.toLocaleString('ko-KR');
+
+            const secondsInCurrentUnit = elapsedSeconds % 30;
+            const progressPercent = (secondsInCurrentUnit / 30) * 100;
+            intervalProgressBar.style.width = `${progressPercent}%`;
+        }
+
+        // --- 쉬는시간(신호 정차) UI 및 제어 ---
+        function formatBreakTime(sec) {
+            const mins = Math.floor(sec / 60);
+            const secs = sec % 60;
+            return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+        }
+
+        function updateBreakUI() {
+            if (isBreakTime) {
+                currentTaskDisplay.textContent = '신호 정차 중입니다. 출발 버튼을 눌러 다시 출발하거나, 잠시 쉬세요.';
+                currentTaskDisplay.className = 'inline-block bg-amber-500/15 border border-amber-500/50 text-amber-300 font-bold text-sm sm:text-base px-4 py-2 rounded-xl max-w-full whitespace-normal leading-snug';
+                breakBanner.classList.remove('hidden');
+                breakBanner.classList.add('flex');
+                breakTimerDisplay.textContent = formatBreakTime(breakRemainingSeconds);
+            } else {
+                currentTaskDisplay.className = 'inline-block bg-navy-950/80 border border-taxi-500/40 text-taxi-400 font-bold text-base sm:text-lg px-4 py-1.5 rounded-xl max-w-full truncate';
+                breakBanner.classList.add('hidden');
+                breakBanner.classList.remove('flex');
+            }
+        }
+
+        function stopBreakTimer() {
+            if (breakInterval) {
+                clearInterval(breakInterval);
+                breakInterval = null;
+            }
+            isBreakTime = false;
+            breakRemainingSeconds = 0;
+            updateBreakUI();
+        }
+
+        function enterBreakTime() {
+            // 20분 주행 완료 후 5분 쉬는시간(신호 정차) 자동 진입
+            isRunning = false;
+            clearInterval(timerInterval);
+            timerInterval = null;
+            studyStreakSeconds = 0;
+            saveTimerToStorage();
+
+            isBreakTime = true;
+            breakRemainingSeconds = BREAK_DURATION_SECONDS;
+            breakEndTimestamp = Date.now() + BREAK_DURATION_SECONDS * 1000;
+
+            btnPause.disabled = false;
+            btnPause.innerHTML = '<span>🚕</span><span>출발</span>';
+            btnPause.className = 'flex items-center justify-center gap-1.5 bg-taxi-500 hover:bg-taxi-600 active:scale-95 text-white font-bold py-3.5 px-4 rounded-xl shadow-lg shadow-taxi-500/20 transition-all cursor-pointer';
+
+            statusBadge.textContent = '신호 정차 (쉬는시간)';
+            statusBadge.className = 'text-xs font-bold px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40';
+
+            taxiCap.textContent = 'TAXI • 신호정차';
+            taxiCap.className = 'px-4 py-1 rounded-full bg-amber-500/20 border border-amber-500/50 text-xs font-black tracking-widest text-amber-300 transition-all';
+            meterCard.classList.remove('running-meter', 'border-taxi-500');
+
+            updateNoiseButtonState();
+            updateBreakUI();
+
+            breakInterval = setInterval(() => {
+                const remaining = Math.ceil((breakEndTimestamp - Date.now()) / 1000);
+                if (remaining <= 0) {
+                    breakRemainingSeconds = 0;
+                    stopBreakTimer();
+                    renderTasks();
+                    startTimer();
+                } else if (remaining !== breakRemainingSeconds) {
+                    breakRemainingSeconds = remaining;
+                    breakTimerDisplay.textContent = formatBreakTime(breakRemainingSeconds);
+                }
+            }, 250);
+        }
+
+        // --- 타이머 제어 기능 (탑승 / 정차·출발 토글 / 초기화) ---
+        function updateNoiseButtonState() {
+            if (isRunning) {
+                btnNoiseToggle.disabled = false;
+                if (isNoisePlaying) {
+                    btnNoiseToggle.textContent = '소리 끄기';
+                    btnNoiseToggle.className = 'px-4 py-2.5 rounded-xl font-bold text-sm bg-taxi-500 hover:bg-taxi-600 text-white transition-all cursor-pointer whitespace-nowrap shadow-md shadow-taxi-500/20';
+                } else {
+                    btnNoiseToggle.textContent = '소리 켜기';
+                    btnNoiseToggle.className = 'px-4 py-2.5 rounded-xl font-bold text-sm bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition-all cursor-pointer whitespace-nowrap';
+                }
+            } else {
+                if (isNoisePlaying) {
+                    stopWhiteNoise();
+                }
+                btnNoiseToggle.disabled = true;
+                btnNoiseToggle.textContent = '주행 중 가능';
+                btnNoiseToggle.className = 'px-4 py-2.5 rounded-xl font-bold text-sm bg-slate-800 text-slate-500 border border-slate-700 transition-all opacity-50 cursor-not-allowed whitespace-nowrap';
+            }
+            updateYoutubeControlsState();
+        }
+
+        function setIdleStateUI() {
+            btnStart.disabled = false;
+            btnStart.classList.remove('opacity-50', 'cursor-not-allowed');
+            btnPause.disabled = true;
+            btnPause.innerHTML = '<span>🛑</span><span>정차</span>';
+            btnPause.className = 'flex items-center justify-center gap-1.5 bg-slate-700 hover:bg-slate-600 active:scale-95 text-white font-bold py-3.5 px-4 rounded-xl transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed';
+
+            statusBadge.textContent = '대기 중';
+            statusBadge.className = 'text-xs font-bold px-2 py-0.5 rounded-full bg-slate-800 text-taxi-400 border border-taxi-500/30';
+            taxiCap.textContent = 'TAXI • 빈차';
+            taxiCap.className = 'px-4 py-1 rounded-full bg-slate-800 border border-slate-600 text-xs font-black tracking-widest text-slate-400 transition-all';
+            updateNoiseButtonState();
+        }
+
+        function startTimer() {
+            if (isRunning) return;
+
+            // 쉬는시간 중에 출발 버튼을 누르면 쉬는시간 종료 후 바로 주행 재개
+            if (isBreakTime) {
+                stopBreakTimer();
+                renderTasks();
+            }
+
+            // 미완료 상태의 유효한 공부 목적지가 선택되어 있는지 확인
+            const validSelectedTask = tasks.find(t => t.id === selectedTaskId && !t.completed);
+            if (!validSelectedTask) {
+                showModal(
+                    '목적지 선택 필요 🚕',
+                    '공부 목적지를 먼저 추가하고 선택해야 택시에 탑승(출발)할 수 있습니다!'
+                );
+                taskInput.focus();
+                return;
+            }
+
+            isRunning = true;
+            btnStart.disabled = true;
+            btnStart.classList.add('opacity-50', 'cursor-not-allowed');
+            
+            // 정차/출발 버튼 활성화 및 '정차' 상태로 표시
+            btnPause.disabled = false;
+            btnPause.innerHTML = '<span>🛑</span><span>정차</span>';
+            btnPause.className = 'flex items-center justify-center gap-1.5 bg-slate-700 hover:bg-slate-600 active:scale-95 text-white font-bold py-3.5 px-4 rounded-xl transition-all cursor-pointer';
+
+            // 시각적 주행 상태 변경
+            statusBadge.textContent = '주행 중 (집중)';
+            statusBadge.className = 'text-xs font-bold px-2 py-0.5 rounded-full bg-taxi-500 text-white animate-pulse';
+            
+            taxiCap.textContent = 'TAXI • 주행중';
+            taxiCap.className = 'px-4 py-1 rounded-full bg-taxi-500 text-white text-xs font-black tracking-widest taxi-sign-active transition-all';
+            meterCard.classList.add('running-meter', 'border-taxi-500');
+
+            updateNoiseButtonState();
+
+            runStartTimestamp = Date.now();
+            baseElapsedSeconds = elapsedSeconds;
+            baseStreakSeconds = studyStreakSeconds;
+
+            timerInterval = setInterval(() => {
+                const deltaSeconds = Math.floor((Date.now() - runStartTimestamp) / 1000);
+                const nextElapsed = baseElapsedSeconds + deltaSeconds;
+
+                if (nextElapsed > elapsedSeconds) {
+                    const diff = nextElapsed - elapsedSeconds;
+                    elapsedSeconds = nextElapsed;
+                    studyStreakSeconds = baseStreakSeconds + deltaSeconds;
+                    saveTimerToStorage();
+                    updateTimerUI();
+
+                    // 설정된 주행 주기 달성 시 자동으로 쉬는시간(신호 정차) 전환
+                    if (diff > 0 && studyStreakSeconds >= STUDY_CYCLE_SECONDS) {
+                        enterBreakTime();
+                    }
+                }
+            }, 200);
+        }
+
+        function pauseTimer() {
+            if (!isRunning) return;
+
+            const deltaSeconds = Math.floor((Date.now() - runStartTimestamp) / 1000);
+            elapsedSeconds = baseElapsedSeconds + deltaSeconds;
+            studyStreakSeconds = baseStreakSeconds + deltaSeconds;
+            updateTimerUI();
+
+            isRunning = false;
+            clearInterval(timerInterval);
+            timerInterval = null;
+            saveTimerToStorage();
+
+            // 정차 시 버튼이 '출발'로 변경되어 다시 누르면 재개 가능
+            btnPause.disabled = false;
+            btnPause.innerHTML = '<span>🚕</span><span>출발</span>';
+            btnPause.className = 'flex items-center justify-center gap-1.5 bg-taxi-500 hover:bg-taxi-600 active:scale-95 text-white font-bold py-3.5 px-4 rounded-xl shadow-lg shadow-taxi-500/20 transition-all cursor-pointer';
+
+            // 시각적 일시정지 상태 변경
+            statusBadge.textContent = '일시 정차';
+            statusBadge.className = 'text-xs font-bold px-2 py-0.5 rounded-full bg-slate-700 text-taxi-400';
+
+            taxiCap.textContent = 'TAXI • 정차중';
+            taxiCap.className = 'px-4 py-1 rounded-full bg-slate-800 border border-taxi-500/50 text-xs font-black tracking-widest text-taxi-400 transition-all';
+            meterCard.classList.remove('running-meter', 'border-taxi-500');
+
+            updateNoiseButtonState();
+        }
+
+        function handlePauseResumeToggle() {
+            if (isRunning) {
+                pauseTimer();
+            } else {
+                startTimer();
+            }
+        }
+
+        function resetTimer() {
+            if (elapsedSeconds === 0 && !isRunning && !btnStart.disabled && !isBreakTime) return;
+
+            showModal(
+                '미터기 초기화',
+                '현재까지 기록된 시간과 누적 집중 점수를 0으로 초기화할까요? (필요하면 먼저 지불 버튼을 눌러 기록을 저장해주세요!)',
+                true,
+                () => {
+                    if (isRunning) {
+                        isRunning = false;
+                        clearInterval(timerInterval);
+                        timerInterval = null;
+                        meterCard.classList.remove('running-meter', 'border-taxi-500');
+                    }
+                    stopBreakTimer();
+                    studyStreakSeconds = 0;
+                    elapsedSeconds = 0;
+                    saveTimerToStorage();
+                    updateTimerUI();
+                    renderTasks();
+                    renderHistoryView();
+                    setIdleStateUI();
+                }
+            );
+        }
+
+        btnStart.addEventListener('click', startTimer);
+        btnPause.addEventListener('click', handlePauseResumeToggle);
+        btnReset.addEventListener('click', resetTimer);
+
+        // --- 현재 집중 세션 저장(지불) 기능 ---
+        function handleSaveSession() {
+            if (elapsedSeconds === 0) {
+                showModal('요금 지불 안내', '지불(저장)할 집중 시간이 없습니다. 먼저 탑승 버튼을 눌러 타이머를 실행해주세요!');
+                return;
+            }
+
+            const currentTask = tasks.find(t => t.id === selectedTaskId);
+            const taskName = currentTask ? currentTask.text : '자유 집중 주행';
+            const earnedScore = Math.floor(elapsedSeconds / 30) * 100;
+
+            const now = new Date();
+            const dateStr = `${now.getFullYear()}.${String(now.getMonth() + 1).padStart(2, '0')}.${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+
+            showModal(
+                '택시 요금 지불 (기록 저장)',
+                `[${taskName}] ${formatTime(elapsedSeconds)} (${earnedScore.toLocaleString('ko-KR')}원) 주행 기록을 집중기록에 지불(저장)하고 현재 미터기를 0으로 초기화할까요?`,
+                true,
+                () => {
+                    if (isRunning) {
+                        isRunning = false;
+                        clearInterval(timerInterval);
+                        timerInterval = null;
+                        meterCard.classList.remove('running-meter', 'border-taxi-500');
+                    }
+                    stopBreakTimer();
+                    studyStreakSeconds = 0;
+                    studyLogs.unshift({
+                        id: Date.now(),
+                        date: dateStr,
+                        taskName: taskName,
+                        seconds: elapsedSeconds,
+                        score: earnedScore
+                    });
+                    saveLogsToStorage();
+
+                    elapsedSeconds = 0;
+                    saveTimerToStorage();
+                    updateTimerUI();
+                    renderTasks();
+                    setIdleStateUI();
+
+                    renderHistoryView();
+                }
+            );
+        }
+
+        btnSaveHome.addEventListener('click', handleSaveSession);
+
+        // --- 집중기록 탭 화면 렌더링 ---
+        function renderHistoryView() {
+            const savedSeconds = studyLogs.reduce((acc, log) => acc + log.seconds, 0);
+            const savedScore = studyLogs.reduce((acc, log) => acc + log.score, 0);
+            const totalSeconds = savedSeconds + elapsedSeconds;
+            const totalScore = savedScore + Math.floor(elapsedSeconds / 30) * 100;
+            const completedTasks = tasks.filter(t => t.completed);
+
+            historyTotalTime.textContent = formatTime(totalSeconds);
+            historyTotalScore.textContent = `${totalScore.toLocaleString('ko-KR')}점`;
+            historyCompletedTasks.textContent = `${completedTasks.length}개`;
+
+            studyLogList.innerHTML = '';
+            if (studyLogs.length === 0) {
+                studyLogList.innerHTML = `
+                    <li class="text-center py-6 text-slate-500 text-sm bg-navy-950/50 rounded-xl border border-dashed border-slate-800">
+                        아직 저장된 주행 일지가 없습니다. 기본화면에서 <span class="text-emerald-400 font-bold">지불</span> 버튼을 눌러 기록을 남겨보세요!
+                    </li>
+                `;
+            } else {
+                studyLogs.forEach(log => {
+                    const li = document.createElement('li');
+                    li.className = 'flex items-center justify-between gap-3 bg-navy-950 border border-slate-800 p-3.5 rounded-xl';
+                    li.innerHTML = `
+                        <div class="min-w-0">
+                            <div class="flex items-center gap-2">
+                                <span class="text-xs font-bold text-taxi-400 truncate">${escapeHtml(log.taskName)}</span>
+                                <span class="text-[11px] text-slate-500 shrink-0">${log.date}</span>
+                            </div>
+                            <p class="text-xs text-slate-300 mt-1 font-mono">
+                                주행 시간: <strong class="text-white">${formatTime(log.seconds)}</strong> · 획득 점수: <strong class="text-taxi-400">+${log.score.toLocaleString('ko-KR')}점</strong>
+                            </p>
+                        </div>
+                        <button type="button" data-log-id="${log.id}" class="delete-log-btn text-slate-500 hover:text-rose-400 p-1.5 rounded-lg hover:bg-slate-800 transition-colors cursor-pointer shrink-0" title="기록 삭제">
+                            ✕
+                        </button>
+                    `;
+                    li.querySelector('.delete-log-btn').addEventListener('click', () => {
+                        studyLogs = studyLogs.filter(item => item.id !== log.id);
+                        saveLogsToStorage();
+                        renderHistoryView();
+                    });
+                    studyLogList.appendChild(li);
+                });
+            }
+
+            completedTaskHistoryList.innerHTML = '';
+            if (completedTasks.length === 0) {
+                completedTaskHistoryList.innerHTML = `
+                    <li class="text-center py-6 text-slate-500 text-sm bg-navy-950/50 rounded-xl border border-dashed border-slate-800">
+                        아직 완료 체크한 공부 목적지가 없습니다.
+                    </li>
+                `;
+            } else {
+                completedTasks.forEach(task => {
+                    const li = document.createElement('li');
+                    li.className = 'flex items-center justify-between bg-navy-950/80 border border-emerald-500/20 px-4 py-3 rounded-xl';
+                    li.innerHTML = `
+                        <span class="text-sm text-slate-200 font-medium truncate">🏁 ${escapeHtml(task.text)}</span>
+                        <span class="text-[11px] font-bold px-2 py-0.5 rounded-md bg-emerald-500/20 text-emerald-400 shrink-0">완주 ✓</span>
+                    `;
+                    completedTaskHistoryList.appendChild(li);
+                });
+            }
+        }
+
+        function escapeHtml(str) {
+            const div = document.createElement('div');
+            div.textContent = str;
+            return div.innerHTML;
+        }
+
+        btnClearLogs.addEventListener('click', () => {
+            if (studyLogs.length === 0) return;
+            showModal(
+                '주행 일지 전체 삭제',
+                '저장된 모든 집중 주행 기록을 삭제할까요? (현재 진행 중인 타이머는 유지됩니다)',
+                true,
+                () => {
+                    studyLogs = [];
+                    saveLogsToStorage();
+                    renderHistoryView();
+                }
+            );
+        });
+
+        // --- 공부 목적지(할 일 목록) 렌더링 및 기능 ---
+        function renderTasks() {
+            taskListEl.innerHTML = '';
+
+            // 완료 개수 업데이트
+            const completedCount = tasks.filter(t => t.completed).length;
+            completedCountEl.textContent = completedCount;
+            totalCountEl.textContent = tasks.length;
+
+            // 상단 미터기 선택 항목 텍스트 업데이트 (쉬는시간 중일 때는 신호 정차 문구 유지)
+            const selectedTask = tasks.find(t => t.id === selectedTaskId && !t.completed);
+            if (isBreakTime) {
+                updateBreakUI();
+            } else if (selectedTask) {
+                currentTaskDisplay.textContent = `🔥 ${selectedTask.text}`;
+            } else {
+                if (selectedTaskId !== null) {
+                    selectedTaskId = null;
+                    saveTasksToStorage();
+                }
+                currentTaskDisplay.textContent = tasks.length === 0 
+                    ? '아래 입력창에서 공부할 목적지를 추가해주세요!' 
+                    : '아래 목록에서 미완료 공부 항목을 선택해주세요!';
+            }
+
+            if (tasks.length === 0) {
+                taskListEl.innerHTML = `
+                    <li class="text-center py-8 text-slate-500 text-sm bg-navy-950/50 rounded-xl border border-dashed border-slate-800">
+                        등록된 공부 목적지가 없습니다. 위 입력창에 추가해보세요!
+                    </li>
+                `;
+                return;
+            }
+
+            tasks.forEach(task => {
+                const isSelected = !task.completed && task.id === selectedTaskId;
+                
+                const li = document.createElement('li');
+                li.className = `group flex items-center justify-between gap-3 p-3.5 rounded-xl border-2 transition-all select-none ${
+                    task.completed
+                        ? 'bg-navy-950/40 border-slate-800/60 opacity-60 cursor-not-allowed'
+                        : isSelected 
+                            ? 'bg-taxi-500/15 border-taxi-500 shadow-md shadow-taxi-500/10 cursor-pointer' 
+                            : 'bg-navy-950 border-slate-800 hover:border-slate-700 cursor-pointer'
+                }`;
+
+                li.addEventListener('click', (e) => {
+                    if (task.completed) return;
+                    if (e.target.closest('.checkbox-wrapper') || e.target.closest('.delete-btn')) return;
+                    selectedTaskId = task.id;
+                    saveTasksToStorage();
+                    renderTasks();
+                });
+
+                const leftDiv = document.createElement('div');
+                leftDiv.className = 'flex items-center gap-3 flex-grow min-w-0';
+
+                const checkboxWrapper = document.createElement('label');
+                checkboxWrapper.className = 'checkbox-wrapper flex items-center cursor-pointer p-1';
+                
+                const checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                checkbox.checked = task.completed;
+                checkbox.className = 'custom-checkbox w-5 h-5 rounded-md border-2 border-slate-600 bg-navy-900 text-taxi-500 focus:ring-0 cursor-pointer transition-colors';
+                checkbox.addEventListener('change', () => {
+                    task.completed = checkbox.checked;
+                    if (task.completed && selectedTaskId === task.id) {
+                        const nextUncompleted = tasks.find(t => !t.completed);
+                        selectedTaskId = nextUncompleted ? nextUncompleted.id : null;
+                    } else if (!task.completed && !selectedTaskId) {
+                        selectedTaskId = task.id;
+                    }
+                    saveTasksToStorage();
+                    renderTasks();
+                    if (activeTab === 'history') renderHistoryView();
+                });
+                checkboxWrapper.appendChild(checkbox);
+
+                const textContainer = document.createElement('div');
+                textContainer.className = 'flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 min-w-0 flex-grow';
+
+                const spanText = document.createElement('span');
+                spanText.textContent = task.text;
+                spanText.className = `text-sm sm:text-base font-medium truncate transition-all ${
+                    task.completed 
+                        ? 'line-through text-slate-500' 
+                        : isSelected ? 'text-white font-bold' : 'text-slate-200'
+                }`;
+
+                const badgeContainer = document.createElement('div');
+                badgeContainer.className = 'flex items-center gap-1.5 shrink-0';
+
+                if (isSelected) {
+                    const selectedBadge = document.createElement('span');
+                    selectedBadge.textContent = '선택됨';
+                    selectedBadge.className = 'text-[11px] font-bold px-2 py-0.5 rounded-md bg-taxi-500 text-white';
+                    badgeContainer.appendChild(selectedBadge);
+                }
+
+                if (task.completed) {
+                    const doneBadge = document.createElement('span');
+                    doneBadge.textContent = '완료됨';
+                    doneBadge.className = 'text-[11px] font-bold px-2 py-0.5 rounded-md bg-emerald-500/20 text-emerald-400 border border-emerald-500/30';
+                    badgeContainer.appendChild(doneBadge);
+                }
+
+                textContainer.appendChild(spanText);
+                textContainer.appendChild(badgeContainer);
+
+                leftDiv.appendChild(checkboxWrapper);
+                leftDiv.appendChild(textContainer);
+
+                const deleteBtn = document.createElement('button');
+                deleteBtn.type = 'button';
+                deleteBtn.className = 'delete-btn text-slate-500 hover:text-rose-400 p-2 rounded-lg hover:bg-slate-800/80 transition-colors cursor-pointer shrink-0';
+                deleteBtn.title = '항목 삭제';
+                deleteBtn.innerHTML = '✕';
+                deleteBtn.addEventListener('click', () => {
+                    tasks = tasks.filter(t => t.id !== task.id);
+                    if (selectedTaskId === task.id) {
+                        const nextUncompleted = tasks.find(t => !t.completed);
+                        selectedTaskId = nextUncompleted ? nextUncompleted.id : null;
+                    }
+                    saveTasksToStorage();
+                    renderTasks();
+                    if (activeTab === 'history') renderHistoryView();
+                });
+
+                li.appendChild(leftDiv);
+                li.appendChild(deleteBtn);
+                taskListEl.appendChild(li);
+            });
+        }
+
+        // 새 항목 추가 이벤트
+        taskForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const rawText = taskInput.value.trim();
+            if (!rawText) return;
+
+            const phonePattern = /01[016789]-?\d{3,4}-?\d{4}/;
+            if (phonePattern.test(rawText)) {
+                showModal('개인정보 보호 안내', '전화번호 등 개인정보는 입력할 수 없습니다. 공부할 과목이나 목표만 적어주세요!');
+                return;
+            }
+
+            const newTask = {
+                id: Date.now(),
+                text: rawText,
+                completed: false
+            };
+
+            tasks.push(newTask);
+            selectedTaskId = newTask.id;
+            taskInput.value = '';
+            saveTasksToStorage();
+            renderTasks();
+        });
+
+        // --- 백색소음(White/Pink Noise) 생성기 (Web Audio API 사용, 외부 파일 없음) ---
+        let audioCtx = null;
+        let noiseNode = null;
+        let gainNode = null;
+        let isNoisePlaying = false;
+
+        const btnNoiseToggle = document.getElementById('btn-noise-toggle');
+        const noiseVolumeSlider = document.getElementById('noise-volume');
+        const noiseStatusText = document.getElementById('noise-status-text');
+        const noiseIconBox = document.getElementById('noise-icon-box');
+
+        function toggleWhiteNoise() {
+            if (!isRunning) {
+                showModal('주행 중 전용 기능 🎧', '백색소음은 택시 주행(공부) 중에만 켤 수 있습니다!');
+                return;
+            }
+            if (!isNoisePlaying) {
+                startWhiteNoise();
+            } else {
+                stopWhiteNoise();
+            }
+        }
+
+        function startWhiteNoise() {
+            try {
+                const AudioContext = window.AudioContext || window.webkitAudioContext;
+                if (!audioCtx) {
+                    audioCtx = new AudioContext();
+                }
+                if (audioCtx.state === 'suspended') {
+                    audioCtx.resume();
+                }
+
+                const bufferSize = audioCtx.sampleRate * 2;
+                const noiseBuffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+                const output = noiseBuffer.getChannelData(0);
+
+                let b0 = 0, b1 = 0, b2 = 0, b3 = 0, b4 = 0, b5 = 0, b6 = 0;
+                for (let i = 0; i < bufferSize; i++) {
+                    const white = Math.random() * 2 - 1;
+                    b0 = 0.99886 * b0 + white * 0.0555179;
+                    b1 = 0.99332 * b1 + white * 0.0750759;
+                    b2 = 0.96900 * b2 + white * 0.1538520;
+                    b3 = 0.86650 * b3 + white * 0.3104856;
+                    b4 = 0.55000 * b4 + white * 0.5329522;
+                    b5 = -0.7616 * b5 - white * 0.0168980;
+                    output[i] = b0 + b1 + b2 + b3 + b4 + b5 + b6 + white * 0.5362;
+                    output[i] *= 0.04;
+                    b6 = white * 0.115926;
+                }
+
+                noiseNode = audioCtx.createBufferSource();
+                noiseNode.buffer = noiseBuffer;
+                noiseNode.loop = true;
+
+                const filter = audioCtx.createBiquadFilter();
+                filter.type = 'lowpass';
+                filter.frequency.value = 1000;
+
+                gainNode = audioCtx.createGain();
+                const volume = noiseVolumeSlider.value / 100;
+                gainNode.gain.value = volume;
+
+                noiseNode.connect(filter);
+                filter.connect(gainNode);
+                gainNode.connect(audioCtx.destination);
+
+                noiseNode.start();
+                isNoisePlaying = true;
+
+                noiseStatusText.textContent = '재생 중 🎵';
+                noiseStatusText.className = 'text-xs font-bold text-taxi-400';
+                noiseIconBox.className = 'w-11 h-11 rounded-xl bg-taxi-500/20 border border-taxi-500/40 flex items-center justify-center text-xl transition-colors';
+                updateNoiseButtonState();
+            } catch (err) {
+                showModal('오디오 안내', '브라우저에서 오디오를 재생할 수 없습니다. 화면을 한 번 클릭한 뒤 다시 시도해주세요.');
+            }
+        }
+
+        function stopWhiteNoise() {
+            if (noiseNode) {
+                try {
+                    noiseNode.stop();
+                    noiseNode.disconnect();
+                } catch (e) {}
+                noiseNode = null;
+            }
+            isNoisePlaying = false;
+
+            noiseStatusText.textContent = '꺼짐';
+            noiseStatusText.className = 'text-xs font-normal text-slate-400';
+            noiseIconBox.className = 'w-11 h-11 rounded-xl bg-slate-800 flex items-center justify-center text-xl transition-colors';
+            if (isRunning) {
+                updateNoiseButtonState();
+            }
+        }
+
+        btnNoiseToggle.addEventListener('click', toggleWhiteNoise);
+
+        noiseVolumeSlider.addEventListener('input', (e) => {
+            if (gainNode && isNoisePlaying) {
+                gainNode.gain.value = e.target.value / 100;
+            }
+        });
+
+        // --- 유튜브 링크 재생 제어 (주행 중 전용) ---
+        const youtubeUrlInput = document.getElementById('youtube-url-input');
+        const btnYtApply = document.getElementById('btn-yt-apply');
+        const btnYtToggle = document.getElementById('btn-yt-toggle');
+        const ytHelperText = document.getElementById('yt-helper-text');
+        const ytNowPlayingCard = document.getElementById('yt-now-playing-card');
+        const ytVideoTitle = document.getElementById('yt-video-title');
+        const ytVideoChannel = document.getElementById('yt-video-channel');
+        const ytLiveBadge = document.getElementById('yt-live-badge');
+        const ytPlayerFrame = document.getElementById('yt-player-frame');
+        let isYoutubePlaying = false;
+        let savedYoutubeTitle = '';
+        let savedYoutubeChannel = '';
+
+        function extractYoutubeVideoId(url) {
+            if (!url) return '';
+            const trimmed = url.trim();
+            const patterns = [
+                /(?:youtube\.com\/watch\?v=|youtube\.com\/embed\/|youtube\.com\/v\/|youtube\.com\/shorts\/)([A-Za-z0-9_-]{11})/,
+                /youtu\.be\/([A-Za-z0-9_-]{11})/
+            ];
+            for (const pattern of patterns) {
+                const match = trimmed.match(pattern);
+                if (match && match[1]) {
+                    return match[1];
+                }
+            }
+            return '';
+        }
+
+        function updateYoutubeMetaCard() {
+            if (!savedYoutubeVideoId) {
+                ytNowPlayingCard.classList.add('hidden');
+                ytNowPlayingCard.classList.remove('flex');
+                return;
+            }
+            ytNowPlayingCard.classList.remove('hidden');
+            ytNowPlayingCard.classList.add('flex');
+            ytVideoTitle.textContent = savedYoutubeTitle || `음원 트랙 (${savedYoutubeVideoId})`;
+            ytVideoChannel.textContent = savedYoutubeChannel ? `아티스트/채널: ${savedYoutubeChannel}` : '음원 트랙 준비됨';
+
+            if (isRunning && isYoutubePlaying) {
+                ytLiveBadge.textContent = '음원 재생 중';
+                ytLiveBadge.className = 'text-[11px] font-bold px-2 py-0.5 rounded-md bg-taxi-500/20 text-taxi-400 border border-taxi-500/40 shrink-0';
+            } else {
+                ytLiveBadge.textContent = '대기';
+                ytLiveBadge.className = 'text-[11px] font-bold px-2 py-0.5 rounded-md bg-slate-800 text-slate-400 shrink-0';
+            }
+        }
+
+        async function fetchYoutubeMetadata(videoId, rawUrl) {
+            if (!videoId) return;
+            savedYoutubeTitle = '노래 제목을 불러오는 중...';
+            savedYoutubeChannel = '';
+            updateYoutubeMetaCard();
+
+            try {
+                const watchUrl = encodeURIComponent(rawUrl || `https://www.youtube.com/watch?v=${videoId}`);
+                const res = await fetch(`https://www.youtube.com/oembed?url=${watchUrl}&format=json`);
+                if (!res.ok) throw new Error('oEmbed fetch failed');
+                const data = await res.json();
+                savedYoutubeTitle = data.title || `음원 트랙 (${videoId})`;
+                savedYoutubeChannel = data.author_name || '';
+            } catch (err) {
+                savedYoutubeTitle = `음원 트랙 (${videoId})`;
+                savedYoutubeChannel = '';
+            }
+            updateYoutubeMetaCard();
+        }
+
+        function stopYoutubePlayback() {
+            isYoutubePlaying = false;
+            if (ytPlayerFrame.src) {
+                // 정차/쉬는시간 전환 시 iframe src를 비워 음원 재생을 중단
+                ytPlayerFrame.src = '';
+            }
+            updateYoutubeControlsState();
+            updateYoutubeMetaCard();
+        }
+
+        function startYoutubePlayback() {
+            if (!isRunning) {
+                showModal('주행 중 전용 기능 🎵', '음원은 택시 주행(공부) 중에만 재생할 수 있습니다!');
+                return;
+            }
+            if (!savedYoutubeVideoId) {
+                showModal('유튜브 링크 필요 🎵', '먼저 유효한 유튜브 링크를 입력하고 [링크 적용]을 눌러주세요!');
+                youtubeUrlInput.focus();
+                return;
+            }
+
+            // 일부 영상은 임베드 재생이 제한될 수 있으므로 playsinline + autoplay 파라미터로 재생 시도
+            ytPlayerFrame.src = `https://www.youtube.com/embed/${savedYoutubeVideoId}?autoplay=1&playsinline=1&rel=0&enablejsapi=1`;
+            isYoutubePlaying = true;
+            updateYoutubeControlsState();
+            updateYoutubeMetaCard();
+        }
+
+        function updateYoutubeControlsState() {
+            if (!isRunning && isYoutubePlaying) {
+                stopYoutubePlayback();
+                return;
+            }
+
+            if (!savedYoutubeVideoId) {
+                btnYtToggle.disabled = true;
+                btnYtToggle.textContent = '링크 먼저 적용';
+                btnYtToggle.className = 'px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm bg-slate-800 text-slate-500 border border-slate-700 transition-all opacity-50 cursor-not-allowed whitespace-nowrap';
+                ytHelperText.textContent = '* 유튜브 링크를 입력하고 [링크 적용]을 누르면 노래 제목을 불러와 주행 중에 음원만 틀어드립니다.';
+                return;
+            }
+
+            if (isRunning) {
+                btnYtToggle.disabled = false;
+                if (isYoutubePlaying) {
+                    btnYtToggle.textContent = '음원 끄기';
+                    btnYtToggle.className = 'px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm bg-rose-600 hover:bg-rose-500 text-white transition-all cursor-pointer whitespace-nowrap shadow-md shadow-rose-600/20';
+                    ytHelperText.textContent = '🎵 주행 중 음원을 재생 중입니다. 정차하거나 쉬는시간이 되면 자동으로 멈춥니다.';
+                } else {
+                    btnYtToggle.textContent = '음원 재생';
+                    btnYtToggle.className = 'px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm bg-taxi-500 hover:bg-taxi-600 text-white transition-all cursor-pointer whitespace-nowrap shadow-md shadow-taxi-500/20';
+                    ytHelperText.textContent = '✅ 노래 제목을 불러왔습니다. [음원 재생]을 누르거나 주행 중 음원을 재생할 수 있습니다!';
+                }
+            } else {
+                btnYtToggle.disabled = true;
+                btnYtToggle.textContent = '주행 중 재생';
+                btnYtToggle.className = 'px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm bg-slate-800 text-slate-500 border border-slate-700 transition-all opacity-50 cursor-not-allowed whitespace-nowrap';
+                ytHelperText.textContent = '* 노래 제목을 불러왔습니다. 탑승 버튼을 누르면 주행 중에 음원을 틀어드립니다.';
+            }
+        }
+
+        btnYtApply.addEventListener('click', async () => {
+            const rawUrl = youtubeUrlInput.value.trim();
+            if (!rawUrl) {
+                savedYoutubeVideoId = '';
+                savedYoutubeTitle = '';
+                savedYoutubeChannel = '';
+                localStorage.removeItem(STORAGE_KEYS.YOUTUBE_URL);
+                stopYoutubePlayback();
+                updateYoutubeControlsState();
+                updateYoutubeMetaCard();
+                return;
+            }
+
+            const videoId = extractYoutubeVideoId(rawUrl);
+            if (!videoId) {
+                showModal('올바르지 않은 링크', '유효한 YouTube URL(watch?v=, youtu.be/, shorts/)을 입력해주세요.');
+                return;
+            }
+
+            savedYoutubeVideoId = videoId;
+            try {
+                localStorage.setItem(STORAGE_KEYS.YOUTUBE_URL, rawUrl);
+            } catch (err) {}
+
+            await fetchYoutubeMetadata(videoId, rawUrl);
+
+            if (isRunning) {
+                startYoutubePlayback();
+            } else {
+                updateYoutubeControlsState();
+                showModal('음원 불러오기 완료 🎵', `"${savedYoutubeTitle}" 음원 정보를 불러왔습니다. 탑승 버튼을 눌러 주행을 시작하면 음원을 재생할 수 있습니다!`);
+            }
+        });
+
+        btnYtToggle.addEventListener('click', () => {
+            if (isYoutubePlaying) {
+                stopYoutubePlayback();
+            } else {
+                startYoutubePlayback();
+            }
+        });
+
+        // --- 초기 실행 (저장된 상태 불러오기) ---
+        window.addEventListener('DOMContentLoaded', () => {
+            loadFromStorage();
+            if (savedYoutubeVideoId) {
+                const initialUrl = `https://www.youtube.com/watch?v=${savedYoutubeVideoId}`;
+                youtubeUrlInput.value = initialUrl;
+                fetchYoutubeMetadata(savedYoutubeVideoId, initialUrl);
+            }
+            syncSettingsInputs();
+            updateTimerUI();
+            renderTasks();
+            renderHistoryView();
+            updateYoutubeControlsState();
+            updateYoutubeMetaCard();
+        });
+    </script>
+</body>
+</html>
