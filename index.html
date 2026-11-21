@@ -112,9 +112,9 @@
             #btn-start, #btn-pause, #btn-save-home, #btn-reset { min-height: 48px; padding: 12px 8px; font-size: 13px; }
             section.bg-navy-900 { border-radius: 18px; }
             #noise-volume, #yt-volume { min-height: 32px; touch-action: pan-x; }
-            #btn-noise-toggle, #btn-yt-apply, #btn-yt-toggle, #btn-yt-skip-ad, #btn-yt-repeat { min-height: 44px; }
+            #btn-noise-toggle, #btn-yt-apply, #btn-yt-toggle, #btn-yt-repeat { min-height: 44px; }
             #youtube-url-input { width: 100%; min-width: 0; min-height: 46px; font-size: 16px; }
-            #btn-yt-apply, #btn-yt-toggle, #btn-yt-skip-ad, #btn-yt-repeat { flex: 1 1 auto; padding-left: 10px; padding-right: 10px; }
+            #btn-yt-apply, #btn-yt-toggle, #btn-yt-repeat { flex: 1 1 auto; padding-left: 10px; padding-right: 10px; }
             #yt-now-playing-card { align-items: flex-start; }
             input, select, textarea, button { max-width: 100%; }
             input[type="range"] { accent-color: #f97316; }
@@ -162,7 +162,7 @@
                                 대기 중
                             </span>
                         </h1>
-                        <p class="text-xs text-taxi-400 font-medium">🚕 콜 택시를 부르는 중...</p>
+                        <p class="text-xs text-taxi-400 font-medium">🚕 카카육 택시를 부르는 중...</p>
                 </div>
             </div>
 
@@ -326,9 +326,6 @@
                             <button id="btn-yt-toggle" type="button" disabled class="px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm bg-slate-800 text-slate-500 border border-slate-700 transition-all opacity-50 cursor-not-allowed whitespace-nowrap">
                                 주행 중 재생
                             </button>
-                            <button id="btn-yt-skip-ad" type="button" disabled title="유튜브는 외부 사이트에 광고 재생 여부를 알려주지 않습니다." class="px-3 py-2.5 rounded-xl font-bold text-xs sm:text-sm bg-slate-800 text-slate-500 border border-slate-700 opacity-50 cursor-not-allowed whitespace-nowrap">
-                                광고 건너뛰기
-                            </button>
                             <button id="btn-yt-repeat" type="button" aria-pressed="false" class="px-3 py-2.5 rounded-xl font-bold text-xs sm:text-sm bg-slate-800 text-slate-300 border border-slate-700 hover:bg-slate-700 whitespace-nowrap">
                                 ↻ 반복 꺼짐
                             </button>
@@ -370,7 +367,6 @@
                                 allowfullscreen
                             ></iframe>
                         </div>
-                        <p class="text-[10px] leading-relaxed text-slate-500">광고 건너뛰기는 유튜브가 허용했을 때 영상 화면 안에 표시됩니다.</p>
                     </div>
                 </div>
             </section>
@@ -481,10 +477,14 @@
                         <p class="text-xs text-slate-500">기본값은 5분입니다. (1~60분 설정 가능)</p>
                     </div>
 
-                    <div class="bg-navy-950 border border-slate-800 rounded-2xl p-4 space-y-2">
-                        <label for="yt-playlist-input" class="block text-sm font-bold text-slate-200">🎵 유튜브 플레이리스트</label>
-                        <textarea id="yt-playlist-input" rows="4" placeholder="유튜브 링크를 한 줄에 하나씩 입력하세요.&#10;https://www.youtube.com/watch?v=...&#10;https://youtu.be/..." class="w-full bg-navy-900 border border-slate-700 focus:border-taxi-500 focus:outline-none rounded-xl px-3.5 py-3 text-sm text-white placeholder-slate-500"></textarea>
-                        <p class="text-xs text-slate-500">설정 저장을 누르면 링크가 저장됩니다. 현재 곡이 끝나면 다음 링크가 자동 재생됩니다.</p>
+                    <div class="bg-navy-950 border border-slate-800 rounded-2xl p-4 space-y-3">
+                        <label for="yt-playlist-link-input" class="block text-sm font-bold text-slate-200">🎵 유튜브 플레이리스트</label>
+                        <div class="flex items-center gap-2 min-w-0">
+                            <input id="yt-playlist-link-input" type="url" placeholder="유튜브 링크를 입력하고 Enter" class="flex-1 min-w-0 w-full bg-navy-900 border border-slate-700 focus:border-taxi-500 focus:outline-none rounded-xl px-3.5 py-3 text-sm text-white placeholder-slate-500">
+                            <button id="btn-add-yt-playlist" type="button" class="shrink-0 px-4 py-3 rounded-xl text-sm font-bold bg-taxi-500 hover:bg-taxi-600 text-white">추가</button>
+                        </div>
+                        <p class="text-xs text-slate-500">링크를 입력하고 Enter를 누르면 영상 제목을 불러와 아래 목록에 등록합니다.</p>
+                        <div id="yt-playlist-list" class="space-y-2" aria-live="polite"></div>
                     </div>
 
                     <div class="flex justify-end gap-2 pt-2">
@@ -753,15 +753,6 @@
             STUDY_CYCLE_SECONDS = studyCycleMinutes * 60;
             BREAK_DURATION_SECONDS = breakDurationMinutes * 60;
 
-            const playlistText = document.getElementById('yt-playlist-input').value;
-            const parsedPlaylist = playlistText.split(/\r?\n/).map(line => line.trim()).filter(Boolean).map(url => ({ url, id: extractYoutubeVideoId(url) }));
-            const invalidLine = parsedPlaylist.find(item => !item.id);
-            if (invalidLine) {
-                showModal('플레이리스트 링크 확인', `유효하지 않은 유튜브 링크가 있습니다:\n${invalidLine.url}`);
-                return;
-            }
-            youtubePlaylist = parsedPlaylist;
-            try { localStorage.setItem(STORAGE_KEYS.YOUTUBE_PLAYLIST, JSON.stringify(youtubePlaylist)); } catch (err) {}
             saveSettingsToStorage();
             showModal('설정 저장 완료 ⚙️', `집중 설정과 플레이리스트 ${youtubePlaylist.length}곡을 저장했습니다.`);
         });
@@ -1522,10 +1513,124 @@
         let youtubeApiReady = false;
         let pendingYoutubeStart = false;
 
-        const ytPlaylistInput = document.getElementById('yt-playlist-input');
+        const ytPlaylistLinkInput = document.getElementById('yt-playlist-link-input');
+        const btnAddYtPlaylist = document.getElementById('btn-add-yt-playlist');
+        const ytPlaylistList = document.getElementById('yt-playlist-list');
         const ytOpenOriginal = document.getElementById('yt-open-original');
         const btnYtRepeat = document.getElementById('btn-yt-repeat');
-        const btnYtSkipAd = document.getElementById('btn-yt-skip-ad');
+
+        function saveYoutubePlaylist() {
+            try {
+                localStorage.setItem(STORAGE_KEYS.YOUTUBE_PLAYLIST, JSON.stringify(youtubePlaylist));
+            } catch (err) {
+                console.warn('플레이리스트 저장 실패:', err);
+            }
+        }
+
+        function renderYoutubePlaylist() {
+            if (!ytPlaylistList) return;
+            ytPlaylistList.replaceChildren();
+
+            if (!youtubePlaylist.length) {
+                const empty = document.createElement('p');
+                empty.className = 'rounded-xl border border-dashed border-slate-700 bg-navy-900/60 px-3 py-4 text-center text-sm text-slate-500';
+                empty.textContent = '등록된 노래가 없습니다. 위 입력창에 유튜브 링크를 추가해보세요!';
+                ytPlaylistList.appendChild(empty);
+                return;
+            }
+
+            youtubePlaylist.forEach((track, index) => {
+                const row = document.createElement('div');
+                row.className = 'flex items-center gap-3 rounded-xl border border-slate-700 bg-navy-900 px-3 py-3 min-w-0';
+
+                const number = document.createElement('span');
+                number.className = 'shrink-0 flex items-center justify-center w-7 h-7 rounded-lg bg-slate-800 text-xs font-bold text-taxi-400';
+                number.textContent = String(index + 1);
+
+                const info = document.createElement('div');
+                info.className = 'flex-1 min-w-0';
+                const title = document.createElement('p');
+                title.className = 'text-sm font-bold text-white truncate';
+                title.textContent = track.title || `영상 제목 불러오는 중...`;
+                const channel = document.createElement('p');
+                channel.className = 'text-xs text-slate-500 truncate';
+                channel.textContent = track.channel || track.url;
+                info.append(title, channel);
+
+                const remove = document.createElement('button');
+                remove.type = 'button';
+                remove.className = 'shrink-0 px-3 py-2 rounded-lg bg-slate-800 hover:bg-rose-600 text-xs font-bold text-slate-300 hover:text-white';
+                remove.textContent = '삭제';
+                remove.setAttribute('aria-label', `${track.title || '재생목록 항목'} 삭제`);
+                remove.addEventListener('click', () => {
+                    youtubePlaylist.splice(index, 1);
+                    if (currentPlaylistIndex === index) currentPlaylistIndex = -1;
+                    else if (currentPlaylistIndex > index) currentPlaylistIndex -= 1;
+                    saveYoutubePlaylist();
+                    renderYoutubePlaylist();
+                });
+
+                row.append(number, info, remove);
+                ytPlaylistList.appendChild(row);
+            });
+        }
+
+        async function getYoutubeMetadata(videoId, rawUrl) {
+            try {
+                const watchUrl = encodeURIComponent(rawUrl || `https://www.youtube.com/watch?v=${videoId}`);
+                const res = await fetch(`https://www.youtube.com/oembed?url=${watchUrl}&format=json`);
+                if (!res.ok) throw new Error('oEmbed fetch failed');
+                const data = await res.json();
+                return {
+                    title: data.title || `음원 트랙 (${videoId})`,
+                    channel: data.author_name || ''
+                };
+            } catch (err) {
+                return { title: `음원 트랙 (${videoId})`, channel: '' };
+            }
+        }
+
+        async function addYoutubePlaylistTrack() {
+            const rawUrl = ytPlaylistLinkInput ? ytPlaylistLinkInput.value.trim() : '';
+            if (!rawUrl) {
+                if (ytPlaylistLinkInput) ytPlaylistLinkInput.focus();
+                return;
+            }
+
+            const videoId = extractYoutubeVideoId(rawUrl);
+            if (!videoId) {
+                showModal('플레이리스트 링크 확인', '올바른 유튜브 영상 링크를 입력해주세요.');
+                return;
+            }
+            if (youtubePlaylist.some(track => track.id === videoId)) {
+                showModal('이미 등록된 노래', '이 노래는 플레이리스트에 이미 등록되어 있습니다.');
+                return;
+            }
+
+            const track = { url: rawUrl, id: videoId, title: '제목 불러오는 중...', channel: '' };
+            youtubePlaylist.push(track);
+            ytPlaylistLinkInput.value = '';
+            saveYoutubePlaylist();
+            renderYoutubePlaylist();
+
+            const metadata = await getYoutubeMetadata(videoId, rawUrl);
+            if (youtubePlaylist.includes(track)) {
+                track.title = metadata.title;
+                track.channel = metadata.channel;
+                saveYoutubePlaylist();
+                renderYoutubePlaylist();
+            }
+        }
+
+        if (btnAddYtPlaylist) btnAddYtPlaylist.addEventListener('click', addYoutubePlaylistTrack);
+        if (ytPlaylistLinkInput) {
+            ytPlaylistLinkInput.addEventListener('keydown', event => {
+                if (event.key === 'Enter') {
+                    event.preventDefault();
+                    addYoutubePlaylistTrack();
+                }
+            });
+        }
 
         function loadYoutubeApi() {
             if (window.YT && window.YT.Player) { youtubeApiReady = true; return; }
@@ -1574,6 +1679,7 @@
                     youtubeUrlInput.value = next.url;
                     if (ytOpenOriginal) ytOpenOriginal.href = `https://www.youtube.com/watch?v=${next.id}`;
                     fetchYoutubeMetadata(next.id, next.url);
+                    renderYoutubePlaylist();
                     if (ytPlayer) ytPlayer.loadVideoById(next.id);
                     else createYoutubePlayer(next.id);
                     updateYoutubeMetaCard();
@@ -1627,17 +1733,9 @@
             savedYoutubeChannel = '';
             updateYoutubeMetaCard();
 
-            try {
-                const watchUrl = encodeURIComponent(rawUrl || `https://www.youtube.com/watch?v=${videoId}`);
-                const res = await fetch(`https://www.youtube.com/oembed?url=${watchUrl}&format=json`);
-                if (!res.ok) throw new Error('oEmbed fetch failed');
-                const data = await res.json();
-                savedYoutubeTitle = data.title || `음원 트랙 (${videoId})`;
-                savedYoutubeChannel = data.author_name || '';
-            } catch (err) {
-                savedYoutubeTitle = `음원 트랙 (${videoId})`;
-                savedYoutubeChannel = '';
-            }
+            const metadata = await getYoutubeMetadata(videoId, rawUrl);
+            savedYoutubeTitle = metadata.title;
+            savedYoutubeChannel = metadata.channel;
             updateYoutubeMetaCard();
         }
 
@@ -1750,6 +1848,7 @@
 
             savedYoutubeVideoId = videoId;
             currentPlaylistIndex = youtubePlaylist.findIndex(item => item.id === videoId);
+            renderYoutubePlaylist();
             if (ytOpenOriginal) ytOpenOriginal.href = `https://www.youtube.com/watch?v=${videoId}`;
             try {
                 localStorage.setItem(STORAGE_KEYS.YOUTUBE_URL, rawUrl);
@@ -1782,15 +1881,21 @@
                 : 'px-3 py-2.5 rounded-xl font-bold text-xs sm:text-sm bg-slate-800 text-slate-300 border border-slate-700 hover:bg-slate-700 whitespace-nowrap';
         });
 
-        // 외부 임베드에서는 광고 재생 상태를 제공하지 않으므로 광고 버튼은 비활성 상태로 둡니다.
-        btnYtSkipAd.addEventListener('click', () => {
-            showModal('광고 건너뛰기', '유튜브 광고 건너뛰기는 유튜브 플레이어 안에서 공식 버튼이 나타날 때 직접 눌러야 합니다.');
-        });
-
         // --- 초기 실행 (저장된 상태 불러오기) ---
         window.addEventListener('DOMContentLoaded', () => {
             loadFromStorage();
-            if (ytPlaylistInput) ytPlaylistInput.value = youtubePlaylist.map(item => item.url).join('\n');
+            renderYoutubePlaylist();
+            youtubePlaylist.forEach(async track => {
+                if (!track.title) {
+                    const metadata = await getYoutubeMetadata(track.id, track.url);
+                    if (youtubePlaylist.includes(track)) {
+                        track.title = metadata.title;
+                        track.channel = metadata.channel;
+                        saveYoutubePlaylist();
+                        renderYoutubePlaylist();
+                    }
+                }
+            });
             loadYoutubeApi();
             if (savedYoutubeVideoId) {
                 const initialUrl = `https://www.youtube.com/watch?v=${savedYoutubeVideoId}`;
