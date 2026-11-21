@@ -112,19 +112,19 @@
             #btn-start, #btn-pause, #btn-save-home, #btn-reset { min-height: 48px; padding: 12px 8px; font-size: 13px; }
             section.bg-navy-900 { border-radius: 18px; }
             #noise-volume, #yt-volume { min-height: 32px; touch-action: pan-x; }
-            #btn-noise-toggle, #btn-yt-apply, #btn-yt-toggle, #btn-yt-repeat { min-height: 44px; }
+            #btn-noise-toggle, #btn-yt-apply, #btn-yt-toggle { min-height: 44px; }
             #youtube-url-input { width: 100%; min-width: 0; min-height: 46px; font-size: 16px; }
-            #btn-yt-apply, #btn-yt-toggle, #btn-yt-repeat { flex: 1 1 auto; padding-left: 10px; padding-right: 10px; }
+            #btn-yt-apply, #btn-yt-toggle { flex: 1 1 0; padding-left: 10px; padding-right: 10px; }
+            #btn-yt-repeat { min-height: 42px; }
+            #yt-player-frame { max-width: min(100%, 380px); }
+            #playlist-create-form button, #playlist-track-form button { min-height: 46px; }
+            #playlist-select { width: 100%; }
             #yt-now-playing-card { align-items: flex-start; }
             input, select, textarea, button { max-width: 100%; }
             input[type="range"] { accent-color: #f97316; }
             /* 긴 텍스트와 표가 화면 너비를 밀어내지 않도록 처리 */
             #current-task-display { overflow-wrap: anywhere; white-space: normal; }
             table { display: block; max-width: 100%; overflow-x: auto; }
-            /* 할 일 추가 폼이 모바일에서 카드 밖으로 튀어나오지 않도록 */
-            #task-form { display: grid !important; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; width: 100%; min-width: 0; box-sizing: border-box; }
-            #task-form #task-input { width: 100%; min-width: 0; max-width: 100%; box-sizing: border-box; }
-            #task-form button { min-width: 0; max-width: 100%; box-sizing: border-box; padding-left: clamp(12px, 3.5vw, 18px); padding-right: clamp(12px, 3.5vw, 18px); white-space: nowrap; }
         }
 
         @media (max-width: 380px) {
@@ -162,7 +162,7 @@
                                 대기 중
                             </span>
                         </h1>
-                        <p class="text-xs text-taxi-400 font-medium">🚕 카카육 택시를 부르는 중...</p>
+                        <p class="text-xs text-taxi-400 font-medium">🚕 콜택시를 부르는 중...</p>
                 </div>
             </div>
 
@@ -319,17 +319,19 @@
                             placeholder="유튜브 링크 입력 (예: https://youtu.be/... 또는 https://www.youtube.com/watch?v=...)"
                             class="flex-grow bg-navy-950 border border-slate-700 focus:border-taxi-500 focus:outline-none rounded-xl px-3.5 py-2.5 text-xs sm:text-sm text-white placeholder-slate-500 transition-colors"
                         >
-                        <div class="flex flex-wrap gap-2 shrink-0">
+                        <div class="flex gap-2 shrink-0">
                             <button id="btn-yt-apply" type="button" class="bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-bold px-3.5 py-2.5 rounded-xl text-xs sm:text-sm transition-colors cursor-pointer">
                                 링크 적용
                             </button>
                             <button id="btn-yt-toggle" type="button" disabled class="px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm bg-slate-800 text-slate-500 border border-slate-700 transition-all opacity-50 cursor-not-allowed whitespace-nowrap">
                                 주행 중 재생
                             </button>
-                            <button id="btn-yt-repeat" type="button" aria-pressed="false" class="px-3 py-2.5 rounded-xl font-bold text-xs sm:text-sm bg-slate-800 text-slate-300 border border-slate-700 hover:bg-slate-700 whitespace-nowrap">
-                                ↻ 반복 꺼짐
-                            </button>
                         </div>
+                    </div>
+                    <div class="flex justify-end">
+                        <button id="btn-yt-repeat" type="button" aria-pressed="false" class="px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition-colors">
+                            🔁 반복 꺼짐
+                        </button>
                     </div>
                     <div class="flex items-center gap-3 bg-navy-950 border border-slate-800 rounded-xl px-3.5 py-3">
                         <span class="text-xs text-slate-400 whitespace-nowrap">🎵 음원 볼륨</span>
@@ -357,16 +359,25 @@
                                 유튜브에서 열기 ↗
                             </a>
                         </div>
-                        <div class="w-full flex justify-center">
-                            <iframe
-                                id="yt-player-frame"
-                                class="block w-full max-w-[560px] aspect-video rounded-lg border border-slate-700 bg-black"
-                                src=""
-                                title="집중 음원 및 유튜브 미리보기"
-                                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                                allowfullscreen
-                            ></iframe>
+                        <!-- 유튜브 화면 영역은 항상 유지하고, 재생 종료 시에는 검은 대기 화면으로 전환합니다. -->
+                        <div id="yt-player-wrap" class="flex w-full justify-center">
+                            <div id="yt-player-stage" class="relative w-full max-w-[380px] aspect-video overflow-hidden rounded-lg border border-slate-700 bg-black">
+                                <iframe
+                                    id="yt-player-frame"
+                                    class="absolute inset-0 h-full w-full bg-black"
+                                    src="about:blank"
+                                    title="집중 음원 및 유튜브 미리보기"
+                                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                                    allowfullscreen
+                                ></iframe>
+                                <div id="yt-player-placeholder" class="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-slate-950 text-center px-4">
+                                    <span class="text-3xl" aria-hidden="true">▶️</span>
+                                    <p id="yt-player-placeholder-title" class="text-sm font-bold text-slate-200">유튜브 화면</p>
+                                    <p id="yt-player-placeholder-message" class="text-xs text-slate-400">링크를 적용하고 주행 중 음원을 재생하면 여기에 표시됩니다.</p>
+                                </div>
+                            </div>
                         </div>
+                        <p class="text-[10px] leading-relaxed text-slate-500">광고 건너뛰기는 유튜브가 허용했을 때 영상 화면 안에 표시됩니다.</p>
                     </div>
                 </div>
             </section>
@@ -477,16 +488,6 @@
                         <p class="text-xs text-slate-500">기본값은 5분입니다. (1~60분 설정 가능)</p>
                     </div>
 
-                    <div class="bg-navy-950 border border-slate-800 rounded-2xl p-4 space-y-3">
-                        <label for="yt-playlist-link-input" class="block text-sm font-bold text-slate-200">🎵 유튜브 플레이리스트</label>
-                        <div class="flex items-center gap-2 min-w-0">
-                            <input id="yt-playlist-link-input" type="url" placeholder="유튜브 링크를 입력하고 Enter" class="flex-1 min-w-0 w-full bg-navy-900 border border-slate-700 focus:border-taxi-500 focus:outline-none rounded-xl px-3.5 py-3 text-sm text-white placeholder-slate-500">
-                            <button id="btn-add-yt-playlist" type="button" class="shrink-0 px-4 py-3 rounded-xl text-sm font-bold bg-taxi-500 hover:bg-taxi-600 text-white">추가</button>
-                        </div>
-                        <p class="text-xs text-slate-500">링크를 입력하고 Enter를 누르면 영상 제목을 불러와 아래 목록에 등록합니다.</p>
-                        <div id="yt-playlist-list" class="space-y-2" aria-live="polite"></div>
-                    </div>
-
                     <div class="flex justify-end gap-2 pt-2">
                         <button id="btn-reset-settings" type="button" class="px-4 py-3 rounded-xl text-sm font-bold bg-slate-800 hover:bg-slate-700 text-slate-300 cursor-pointer transition-colors">
                             기본값 복원 (20분/5분)
@@ -496,6 +497,50 @@
                         </button>
                     </div>
                 </form>
+            </section>
+
+            <section class="bg-navy-900 border border-slate-800 rounded-2xl p-5 sm:p-6 shadow-lg space-y-4">
+                <div class="flex items-center gap-2.5 border-b border-slate-800 pb-4">
+                    <span class="text-2xl">🎵</span>
+                    <div>
+                        <h2 class="font-bold text-lg text-white">유튜브 플레이리스트</h2>
+                        <p class="text-xs text-slate-400 mt-0.5">플레이리스트를 만들고 링크를 등록하면 영상 제목으로 목록에 저장됩니다.</p>
+                    </div>
+                </div>
+
+                <form id="playlist-create-form" class="flex gap-2">
+                    <input id="playlist-name-input" type="text" maxlength="30" required placeholder="새 플레이리스트 이름 (예: 공부할 때 듣는 노래)" class="min-w-0 flex-1 bg-navy-950 border border-slate-700 focus:border-taxi-500 focus:outline-none rounded-xl px-3.5 py-3 text-sm text-white placeholder-slate-500">
+                    <button type="submit" class="shrink-0 bg-taxi-500 hover:bg-taxi-600 text-white font-bold px-4 py-3 rounded-xl text-sm">+ 만들기</button>
+                </form>
+
+                <div id="playlist-empty-state" class="text-center py-6 text-sm text-slate-500 bg-navy-950/50 rounded-xl border border-dashed border-slate-800">
+                    아직 플레이리스트가 없습니다. 위에서 이름을 입력해 만들어주세요.
+                </div>
+
+                <div id="playlist-manager" class="hidden space-y-4">
+                    <div class="flex flex-col sm:flex-row gap-2 sm:items-center">
+                        <label for="playlist-select" class="text-sm font-bold text-slate-300 shrink-0">현재 플레이리스트</label>
+                        <select id="playlist-select" class="min-w-0 flex-1 bg-navy-950 border border-slate-700 focus:border-taxi-500 focus:outline-none rounded-xl px-3 py-3 text-sm text-white"></select>
+                        <button id="btn-delete-playlist" type="button" class="px-3 py-3 rounded-xl text-xs font-bold bg-slate-800 hover:bg-rose-600/20 text-slate-300 hover:text-rose-300 border border-slate-700">목록 삭제</button>
+                    </div>
+
+                    <form id="playlist-track-form" class="space-y-2">
+                        <label for="playlist-track-url" class="block text-sm font-bold text-slate-200">🔗 유튜브 링크 등록</label>
+                        <div class="flex gap-2">
+                            <input id="playlist-track-url" type="url" required placeholder="유튜브 링크를 붙여넣고 엔터" class="min-w-0 flex-1 bg-navy-950 border border-slate-700 focus:border-taxi-500 focus:outline-none rounded-xl px-3.5 py-3 text-sm text-white placeholder-slate-500">
+                            <button id="btn-add-playlist-track" type="submit" class="shrink-0 bg-slate-700 hover:bg-slate-600 text-white font-bold px-4 py-3 rounded-xl text-sm">등록</button>
+                        </div>
+                        <p class="text-[11px] text-slate-500">링크를 등록하면 유튜브에서 제목과 채널을 불러와 아래 등록 목록에 표시합니다.</p>
+                    </form>
+
+                    <div class="border-t border-slate-800 pt-3 space-y-2">
+                        <div class="flex items-center justify-between gap-2">
+                            <h3 class="text-sm font-bold text-white">등록된 음원</h3>
+                            <span id="playlist-track-count" class="text-xs text-taxi-400 font-bold">0곡</span>
+                        </div>
+                        <ul id="playlist-track-list" class="space-y-2"></ul>
+                    </div>
+                </div>
             </section>
         </div>
 
@@ -539,7 +584,10 @@
             ELAPSED_SECONDS: 'taxi_timer_elapsed_seconds_v1',
             STUDY_LOGS: 'taxi_timer_study_logs_v1',
             YOUTUBE_URL: 'taxi_timer_youtube_url_v1',
-            YOUTUBE_PLAYLIST: 'taxi_timer_youtube_playlist_v1'
+            SETTINGS: 'taxi_timer_settings_v1',
+            YOUTUBE_REPEAT: 'taxi_timer_youtube_repeat_v1',
+            PLAYLISTS: 'taxi_timer_youtube_playlists_v1',
+            ACTIVE_PLAYLIST_ID: 'taxi_timer_active_playlist_id_v1'
         };
 
         // --- 상태 변수 초기화 ---
@@ -568,6 +616,9 @@
         let tasks = [];
         let selectedTaskId = null;
         let studyLogs = [];           // 저장된 집중 기록 리스트
+        let youtubePlaylists = [];
+        let activePlaylistId = null;
+        let isYoutubeRepeatEnabled = false;
 
         // --- 로컬 저장소 저장 및 불러오기 함수 ---
         function saveTasksToStorage() {
@@ -657,18 +708,36 @@
                     }
                 }
 
-                const savedPlaylist = localStorage.getItem(STORAGE_KEYS.YOUTUBE_PLAYLIST);
-                if (savedPlaylist) {
-                    const parsedPlaylist = JSON.parse(savedPlaylist);
-                    if (Array.isArray(parsedPlaylist)) youtubePlaylist = parsedPlaylist.filter(item => item && typeof item.id === 'string');
-                }
-
                 const savedYtUrl = localStorage.getItem(STORAGE_KEYS.YOUTUBE_URL);
                 if (savedYtUrl) {
                     const extractedId = extractYoutubeVideoId(savedYtUrl);
                     if (extractedId) {
                         savedYoutubeVideoId = extractedId;
                     }
+                }
+
+                const savedRepeat = localStorage.getItem(STORAGE_KEYS.YOUTUBE_REPEAT);
+                isYoutubeRepeatEnabled = savedRepeat === 'true';
+
+                const savedPlaylists = localStorage.getItem(STORAGE_KEYS.PLAYLISTS);
+                if (savedPlaylists) {
+                    const parsedPlaylists = JSON.parse(savedPlaylists);
+                    if (Array.isArray(parsedPlaylists)) {
+                        youtubePlaylists = parsedPlaylists
+                            .filter(list => list && typeof list.name === 'string' && Array.isArray(list.tracks))
+                            .map(list => ({
+                                id: list.id || Date.now() + Math.random(),
+                                name: list.name,
+                                tracks: list.tracks.filter(track => track && typeof track.videoId === 'string')
+                            }));
+                    }
+                }
+                const savedActivePlaylistId = localStorage.getItem(STORAGE_KEYS.ACTIVE_PLAYLIST_ID);
+                if (savedActivePlaylistId !== null) {
+                    activePlaylistId = savedActivePlaylistId;
+                }
+                if (!youtubePlaylists.some(list => String(list.id) === String(activePlaylistId))) {
+                    activePlaylistId = youtubePlaylists.length ? youtubePlaylists[0].id : null;
                 }
             } catch (e) {
                 console.warn('로컬 저장소 불러오기 실패:', e);
@@ -727,11 +796,179 @@
         const inputStudyCycle = document.getElementById('input-study-cycle');
         const inputBreakDuration = document.getElementById('input-break-duration');
 
+        // 플레이리스트 관리 요소
+        const playlistCreateForm = document.getElementById('playlist-create-form');
+        const playlistNameInput = document.getElementById('playlist-name-input');
+        const playlistEmptyState = document.getElementById('playlist-empty-state');
+        const playlistManager = document.getElementById('playlist-manager');
+        const playlistSelect = document.getElementById('playlist-select');
+        const btnDeletePlaylist = document.getElementById('btn-delete-playlist');
+        const playlistTrackForm = document.getElementById('playlist-track-form');
+        const playlistTrackUrl = document.getElementById('playlist-track-url');
+        const btnAddPlaylistTrack = document.getElementById('btn-add-playlist-track');
+        const playlistTrackList = document.getElementById('playlist-track-list');
+        const playlistTrackCount = document.getElementById('playlist-track-count');
+
         // --- 설정 폼 동기화 및 저장 제어 ---
         function syncSettingsInputs() {
             inputStudyCycle.value = studyCycleMinutes;
             inputBreakDuration.value = breakDurationMinutes;
         }
+
+        function savePlaylistsToStorage() {
+            try {
+                localStorage.setItem(STORAGE_KEYS.PLAYLISTS, JSON.stringify(youtubePlaylists));
+                if (activePlaylistId !== null) {
+                    localStorage.setItem(STORAGE_KEYS.ACTIVE_PLAYLIST_ID, String(activePlaylistId));
+                } else {
+                    localStorage.removeItem(STORAGE_KEYS.ACTIVE_PLAYLIST_ID);
+                }
+            } catch (err) {
+                console.warn('플레이리스트 저장 실패:', err);
+            }
+        }
+
+        function getActivePlaylist() {
+            return youtubePlaylists.find(list => String(list.id) === String(activePlaylistId)) || null;
+        }
+
+        function renderPlaylistManager() {
+            const activeList = getActivePlaylist();
+            playlistSelect.innerHTML = '';
+            youtubePlaylists.forEach(list => {
+                const option = document.createElement('option');
+                option.value = String(list.id);
+                option.textContent = list.name;
+                playlistSelect.appendChild(option);
+            });
+
+            const hasPlaylists = youtubePlaylists.length > 0;
+            playlistEmptyState.classList.toggle('hidden', hasPlaylists);
+            playlistManager.classList.toggle('hidden', !hasPlaylists);
+            if (!hasPlaylists) {
+                playlistTrackList.innerHTML = '';
+                playlistTrackCount.textContent = '0곡';
+                return;
+            }
+
+            playlistSelect.value = String(activePlaylistId);
+            playlistTrackList.innerHTML = '';
+            const tracks = activeList ? activeList.tracks : [];
+            playlistTrackCount.textContent = `${tracks.length}곡`;
+
+            if (!tracks.length) {
+                playlistTrackList.innerHTML = '<li class="text-center py-5 text-xs text-slate-500 bg-navy-950/50 rounded-xl border border-dashed border-slate-800">아직 등록된 음원이 없습니다. 위 링크 입력창에 유튜브 링크를 넣어주세요.</li>';
+                return;
+            }
+
+            tracks.forEach((track, index) => {
+                const li = document.createElement('li');
+                li.className = 'flex items-center gap-2 bg-navy-950 border border-slate-800 rounded-xl p-3';
+
+                const info = document.createElement('div');
+                info.className = 'min-w-0 flex-1';
+                const title = document.createElement('p');
+                title.className = 'text-sm font-bold text-white truncate';
+                title.textContent = track.title || `음원 ${index + 1}`;
+                const channel = document.createElement('p');
+                channel.className = 'text-[11px] text-slate-400 truncate mt-0.5';
+                channel.textContent = track.channel || 'YouTube';
+                info.append(title, channel);
+
+                const playBtn = document.createElement('button');
+                playBtn.type = 'button';
+                playBtn.className = 'shrink-0 px-3 py-2 rounded-lg bg-taxi-500 hover:bg-taxi-600 text-white text-xs font-bold';
+                playBtn.textContent = '선택';
+                playBtn.addEventListener('click', () => loadPlaylistTrack(track));
+
+                const deleteBtn = document.createElement('button');
+                deleteBtn.type = 'button';
+                deleteBtn.className = 'shrink-0 px-2.5 py-2 rounded-lg bg-slate-800 hover:bg-rose-600/20 text-slate-400 hover:text-rose-300 text-xs font-bold';
+                deleteBtn.textContent = '삭제';
+                deleteBtn.addEventListener('click', () => {
+                    const list = getActivePlaylist();
+                    if (!list) return;
+                    list.tracks = list.tracks.filter(item => item.id !== track.id);
+                    savePlaylistsToStorage();
+                    renderPlaylistManager();
+                });
+
+                li.append(info, playBtn, deleteBtn);
+                playlistTrackList.appendChild(li);
+            });
+        }
+
+        playlistCreateForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const name = playlistNameInput.value.trim();
+            if (!name) return;
+            const newPlaylist = { id: `playlist-${Date.now()}`, name, tracks: [] };
+            youtubePlaylists.push(newPlaylist);
+            activePlaylistId = newPlaylist.id;
+            playlistNameInput.value = '';
+            savePlaylistsToStorage();
+            renderPlaylistManager();
+        });
+
+        playlistSelect.addEventListener('change', () => {
+            activePlaylistId = playlistSelect.value;
+            savePlaylistsToStorage();
+            renderPlaylistManager();
+        });
+
+        btnDeletePlaylist.addEventListener('click', () => {
+            const activeList = getActivePlaylist();
+            if (!activeList) return;
+            showModal('플레이리스트 삭제', `“${activeList.name}” 플레이리스트를 삭제할까요? 등록된 음원도 함께 삭제됩니다.`, true, () => {
+                youtubePlaylists = youtubePlaylists.filter(list => String(list.id) !== String(activePlaylistId));
+                activePlaylistId = youtubePlaylists.length ? youtubePlaylists[0].id : null;
+                savePlaylistsToStorage();
+                renderPlaylistManager();
+            });
+        });
+
+        playlistTrackForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const activeList = getActivePlaylist();
+            const rawUrl = playlistTrackUrl.value.trim();
+            if (!activeList) {
+                showModal('플레이리스트 필요', '먼저 플레이리스트를 만들어주세요.');
+                return;
+            }
+            if (!rawUrl) return;
+            const videoId = extractYoutubeVideoId(rawUrl);
+            if (!videoId) {
+                showModal('올바르지 않은 링크', '유효한 YouTube 링크를 입력해주세요.');
+                return;
+            }
+            if (activeList.tracks.some(track => track.videoId === videoId)) {
+                showModal('이미 등록된 음원', '현재 플레이리스트에 이미 등록된 음원입니다.');
+                return;
+            }
+
+            btnAddPlaylistTrack.disabled = true;
+            btnAddPlaylistTrack.textContent = '불러오는 중';
+            try {
+                const metadata = await requestYoutubeMetadata(videoId, rawUrl);
+                const latestList = getActivePlaylist();
+                if (!latestList) return;
+                latestList.tracks.push({
+                    id: `${videoId}-${Date.now()}`,
+                    videoId,
+                    url: rawUrl,
+                    title: metadata.title || `음원 (${videoId})`,
+                    channel: metadata.channel || ''
+                });
+                savePlaylistsToStorage();
+                renderPlaylistManager();
+                playlistTrackUrl.value = '';
+            } catch (err) {
+                showModal('음원 등록 실패', '영상 정보를 불러오지 못했습니다. 링크를 확인한 뒤 다시 시도해주세요.');
+            } finally {
+                btnAddPlaylistTrack.disabled = false;
+                btnAddPlaylistTrack.textContent = '등록';
+            }
+        });
 
         btnResetSettings.addEventListener('click', () => {
             studyCycleMinutes = 20;
@@ -754,7 +991,7 @@
             BREAK_DURATION_SECONDS = breakDurationMinutes * 60;
 
             saveSettingsToStorage();
-            showModal('설정 저장 완료 ⚙️', `집중 설정과 플레이리스트 ${youtubePlaylist.length}곡을 저장했습니다.`);
+            showModal('설정 저장 완료 ⚙️', `이제 ${studyCycleMinutes}분 주행마다 ${breakDurationMinutes}분 쉬는시간(신호 정차)이 적용됩니다.`);
         });
 
         // --- 유틸리티 함수: 모달 창 띄우기 (alert/confirm 대체) ---
@@ -1495,216 +1732,66 @@
         const youtubeUrlInput = document.getElementById('youtube-url-input');
         const btnYtApply = document.getElementById('btn-yt-apply');
         const btnYtToggle = document.getElementById('btn-yt-toggle');
+        const btnYtRepeat = document.getElementById('btn-yt-repeat');
         const ytHelperText = document.getElementById('yt-helper-text');
         const ytNowPlayingCard = document.getElementById('yt-now-playing-card');
         const ytVideoTitle = document.getElementById('yt-video-title');
         const ytVideoChannel = document.getElementById('yt-video-channel');
         const ytLiveBadge = document.getElementById('yt-live-badge');
         const ytPlayerFrame = document.getElementById('yt-player-frame');
+        const ytPlayerWrap = document.getElementById('yt-player-wrap');
+        const ytPlayerPlaceholder = document.getElementById('yt-player-placeholder');
+        const ytPlayerPlaceholderTitle = document.getElementById('yt-player-placeholder-title');
+        const ytPlayerPlaceholderMessage = document.getElementById('yt-player-placeholder-message');
         const ytVolumeSlider = document.getElementById('yt-volume');
         const ytVolumeValue = document.getElementById('yt-volume-value');
+        const ytOpenOriginal = document.getElementById('yt-open-original');
         let isYoutubePlaying = false;
         let savedYoutubeTitle = '';
         let savedYoutubeChannel = '';
-        let youtubePlaylist = [];
-        let currentPlaylistIndex = -1;
-        let repeatCurrentTrack = false;
-        let ytPlayer = null;
-        let youtubeApiReady = false;
-        let pendingYoutubeStart = false;
-
-        const ytPlaylistLinkInput = document.getElementById('yt-playlist-link-input');
-        const btnAddYtPlaylist = document.getElementById('btn-add-yt-playlist');
-        const ytPlaylistList = document.getElementById('yt-playlist-list');
-        const ytOpenOriginal = document.getElementById('yt-open-original');
-        const btnYtRepeat = document.getElementById('btn-yt-repeat');
-
-        function saveYoutubePlaylist() {
-            try {
-                localStorage.setItem(STORAGE_KEYS.YOUTUBE_PLAYLIST, JSON.stringify(youtubePlaylist));
-            } catch (err) {
-                console.warn('플레이리스트 저장 실패:', err);
-            }
-        }
-
-        function renderYoutubePlaylist() {
-            if (!ytPlaylistList) return;
-            ytPlaylistList.replaceChildren();
-
-            if (!youtubePlaylist.length) {
-                const empty = document.createElement('p');
-                empty.className = 'rounded-xl border border-dashed border-slate-700 bg-navy-900/60 px-3 py-4 text-center text-sm text-slate-500';
-                empty.textContent = '등록된 노래가 없습니다. 위 입력창에 유튜브 링크를 추가해보세요!';
-                ytPlaylistList.appendChild(empty);
-                return;
-            }
-
-            youtubePlaylist.forEach((track, index) => {
-                const row = document.createElement('div');
-                row.className = 'flex items-center gap-3 rounded-xl border border-slate-700 bg-navy-900 px-3 py-3 min-w-0';
-
-                const number = document.createElement('span');
-                number.className = 'shrink-0 flex items-center justify-center w-7 h-7 rounded-lg bg-slate-800 text-xs font-bold text-taxi-400';
-                number.textContent = String(index + 1);
-
-                const info = document.createElement('div');
-                info.className = 'flex-1 min-w-0';
-                const title = document.createElement('p');
-                title.className = 'text-sm font-bold text-white truncate';
-                title.textContent = track.title || `영상 제목 불러오는 중...`;
-                const channel = document.createElement('p');
-                channel.className = 'text-xs text-slate-500 truncate';
-                channel.textContent = track.channel || track.url;
-                info.append(title, channel);
-
-                const remove = document.createElement('button');
-                remove.type = 'button';
-                remove.className = 'shrink-0 px-3 py-2 rounded-lg bg-slate-800 hover:bg-rose-600 text-xs font-bold text-slate-300 hover:text-white';
-                remove.textContent = '삭제';
-                remove.setAttribute('aria-label', `${track.title || '재생목록 항목'} 삭제`);
-                remove.addEventListener('click', () => {
-                    youtubePlaylist.splice(index, 1);
-                    if (currentPlaylistIndex === index) currentPlaylistIndex = -1;
-                    else if (currentPlaylistIndex > index) currentPlaylistIndex -= 1;
-                    saveYoutubePlaylist();
-                    renderYoutubePlaylist();
-                });
-
-                row.append(number, info, remove);
-                ytPlaylistList.appendChild(row);
-            });
-        }
-
-        async function getYoutubeMetadata(videoId, rawUrl) {
-            try {
-                const watchUrl = encodeURIComponent(rawUrl || `https://www.youtube.com/watch?v=${videoId}`);
-                const res = await fetch(`https://www.youtube.com/oembed?url=${watchUrl}&format=json`);
-                if (!res.ok) throw new Error('oEmbed fetch failed');
-                const data = await res.json();
-                return {
-                    title: data.title || `음원 트랙 (${videoId})`,
-                    channel: data.author_name || ''
-                };
-            } catch (err) {
-                return { title: `음원 트랙 (${videoId})`, channel: '' };
-            }
-        }
-
-        async function addYoutubePlaylistTrack() {
-            const rawUrl = ytPlaylistLinkInput ? ytPlaylistLinkInput.value.trim() : '';
-            if (!rawUrl) {
-                if (ytPlaylistLinkInput) ytPlaylistLinkInput.focus();
-                return;
-            }
-
-            const videoId = extractYoutubeVideoId(rawUrl);
-            if (!videoId) {
-                showModal('플레이리스트 링크 확인', '올바른 유튜브 영상 링크를 입력해주세요.');
-                return;
-            }
-            if (youtubePlaylist.some(track => track.id === videoId)) {
-                showModal('이미 등록된 노래', '이 노래는 플레이리스트에 이미 등록되어 있습니다.');
-                return;
-            }
-
-            const track = { url: rawUrl, id: videoId, title: '제목 불러오는 중...', channel: '' };
-            youtubePlaylist.push(track);
-            ytPlaylistLinkInput.value = '';
-            saveYoutubePlaylist();
-            renderYoutubePlaylist();
-
-            const metadata = await getYoutubeMetadata(videoId, rawUrl);
-            if (youtubePlaylist.includes(track)) {
-                track.title = metadata.title;
-                track.channel = metadata.channel;
-                saveYoutubePlaylist();
-                renderYoutubePlaylist();
-            }
-        }
-
-        if (btnAddYtPlaylist) btnAddYtPlaylist.addEventListener('click', addYoutubePlaylistTrack);
-        if (ytPlaylistLinkInput) {
-            ytPlaylistLinkInput.addEventListener('keydown', event => {
-                if (event.key === 'Enter') {
-                    event.preventDefault();
-                    addYoutubePlaylistTrack();
-                }
-            });
-        }
-
-        function loadYoutubeApi() {
-            if (window.YT && window.YT.Player) { youtubeApiReady = true; return; }
-            if (document.getElementById('youtube-iframe-api')) return;
-            const tag = document.createElement('script');
-            tag.id = 'youtube-iframe-api';
-            tag.src = 'https://www.youtube.com/iframe_api';
-            document.head.appendChild(tag);
-        }
-
-        window.onYouTubeIframeAPIReady = function() {
-            youtubeApiReady = true;
-            if (pendingYoutubeStart && savedYoutubeVideoId) createYoutubePlayer(savedYoutubeVideoId);
-        };
-
-        function createYoutubePlayer(videoId) {
-            if (!youtubeApiReady || !window.YT || !window.YT.Player) { pendingYoutubeStart = true; loadYoutubeApi(); return; }
-            pendingYoutubeStart = false;
-            if (ytPlayer) {
-                ytPlayer.loadVideoById(videoId);
-                return;
-            }
-            ytPlayer = new YT.Player('yt-player-frame', {
-                videoId,
-                playerVars: { autoplay: 1, playsinline: 1, controls: 1, rel: 0 },
-                events: {
-                    onReady: event => { event.target.setVolume(Number(ytVolumeSlider.value)); event.target.playVideo(); },
-                    onStateChange: event => {
-                        if (event.data === YT.PlayerState.ENDED) handleYoutubeTrackEnded();
-                    }
-                }
-            });
-        }
-
-        function handleYoutubeTrackEnded() {
-            if (repeatCurrentTrack) {
-                if (ytPlayer) { ytPlayer.seekTo(0, true); ytPlayer.playVideo(); }
-                return;
-            }
-            if (youtubePlaylist.length) {
-                const nextIndex = currentPlaylistIndex < 0 ? 0 : currentPlaylistIndex + 1;
-                if (nextIndex < youtubePlaylist.length) {
-                    currentPlaylistIndex = nextIndex;
-                    const next = youtubePlaylist[currentPlaylistIndex];
-                    savedYoutubeVideoId = next.id;
-                    youtubeUrlInput.value = next.url;
-                    if (ytOpenOriginal) ytOpenOriginal.href = `https://www.youtube.com/watch?v=${next.id}`;
-                    fetchYoutubeMetadata(next.id, next.url);
-                    renderYoutubePlaylist();
-                    if (ytPlayer) ytPlayer.loadVideoById(next.id);
-                    else createYoutubePlayer(next.id);
-                    updateYoutubeMetaCard();
-                    return;
-                }
-            }
-            isYoutubePlaying = false;
-            updateYoutubeControlsState();
-            updateYoutubeMetaCard();
-        }
 
         function extractYoutubeVideoId(url) {
             if (!url) return '';
             const trimmed = url.trim();
             const patterns = [
-                /(?:youtube\.com\/watch\?v=|youtube\.com\/embed\/|youtube\.com\/v\/|youtube\.com\/shorts\/)([A-Za-z0-9_-]{11})/,
+                /(?:youtube\.com\/(?:watch\?v=|embed\/|v\/|shorts\/))([A-Za-z0-9_-]{11})/,
                 /youtu\.be\/([A-Za-z0-9_-]{11})/
             ];
             for (const pattern of patterns) {
                 const match = trimmed.match(pattern);
-                if (match && match[1]) {
-                    return match[1];
-                }
+                if (match && match[1]) return match[1];
             }
             return '';
+        }
+
+        async function requestYoutubeMetadata(videoId, rawUrl) {
+            const watchUrl = encodeURIComponent(rawUrl || `https://www.youtube.com/watch?v=${videoId}`);
+            const res = await fetch(`https://www.youtube.com/oembed?url=${watchUrl}&format=json`);
+            if (!res.ok) throw new Error('YouTube metadata request failed');
+            const data = await res.json();
+            return {
+                title: data.title || `음원 트랙 (${videoId})`,
+                channel: data.author_name || ''
+            };
+        }
+
+        async function fetchYoutubeMetadata(videoId, rawUrl) {
+            if (!videoId) return;
+            savedYoutubeTitle = '노래 제목을 불러오는 중...';
+            savedYoutubeChannel = '';
+            updateYoutubeMetaCard();
+            try {
+                const metadata = await requestYoutubeMetadata(videoId, rawUrl);
+                // 다른 링크를 적용한 뒤 늦게 도착한 이전 응답은 무시합니다.
+                if (savedYoutubeVideoId !== videoId) return;
+                savedYoutubeTitle = metadata.title;
+                savedYoutubeChannel = metadata.channel;
+            } catch (err) {
+                if (savedYoutubeVideoId !== videoId) return;
+                savedYoutubeTitle = `음원 트랙 (${videoId})`;
+                savedYoutubeChannel = '';
+            }
+            updateYoutubeMetaCard();
         }
 
         function updateYoutubeMetaCard() {
@@ -1727,38 +1814,101 @@
             }
         }
 
-        async function fetchYoutubeMetadata(videoId, rawUrl) {
-            if (!videoId) return;
-            savedYoutubeTitle = '노래 제목을 불러오는 중...';
-            savedYoutubeChannel = '';
-            updateYoutubeMetaCard();
+        function updateYoutubeRepeatButton() {
+            btnYtRepeat.setAttribute('aria-pressed', String(isYoutubeRepeatEnabled));
+            if (isYoutubeRepeatEnabled) {
+                btnYtRepeat.textContent = '🔁 반복 켜짐';
+                btnYtRepeat.className = 'px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold bg-taxi-500/20 hover:bg-taxi-500/30 text-taxi-300 border border-taxi-500/50 transition-colors';
+            } else {
+                btnYtRepeat.textContent = '🔁 반복 꺼짐';
+                btnYtRepeat.className = 'px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition-colors';
+            }
+        }
 
-            const metadata = await getYoutubeMetadata(videoId, rawUrl);
-            savedYoutubeTitle = metadata.title;
-            savedYoutubeChannel = metadata.channel;
-            updateYoutubeMetaCard();
+        function buildYoutubeEmbedUrl(autoplay = true) {
+            if (!savedYoutubeVideoId) return '';
+            const params = new URLSearchParams({
+                autoplay: autoplay ? '1' : '0',
+                playsinline: '1',
+                controls: '1',
+                rel: '0',
+                enablejsapi: '1',
+                origin: window.location.origin
+            });
+            // YouTube 단일 영상 반복 재생은 loop=1과 playlist=영상 ID를 함께 지정해야 합니다.
+            if (isYoutubeRepeatEnabled) {
+                params.set('loop', '1');
+                params.set('playlist', savedYoutubeVideoId);
+            }
+            return `https://www.youtube.com/embed/${savedYoutubeVideoId}?${params.toString()}`;
+        }
+
+        function sendYoutubePlayerCommand(func, args = []) {
+            const frameSrc = ytPlayerFrame.getAttribute('src') || '';
+            // about:blank 대기 화면에는 YouTube 명령을 보내지 않습니다.
+            if (!savedYoutubeVideoId || !ytPlayerFrame.contentWindow || !frameSrc.includes('/embed/')) return;
+            ytPlayerFrame.contentWindow.postMessage(JSON.stringify({
+                event: 'command',
+                func,
+                args
+            }), 'https://www.youtube.com');
         }
 
         function applyYoutubeVolume() {
             const volume = Number(ytVolumeSlider.value);
             ytVolumeValue.textContent = `${volume}%`;
-            if (ytPlayer && typeof ytPlayer.setVolume === 'function') ytPlayer.setVolume(volume);
+            sendYoutubePlayerCommand('setVolume', [volume]);
         }
 
-        ytVolumeSlider.addEventListener('input', applyYoutubeVolume);
+        function showYoutubePlayer() {
+            // 화면 영역은 숨기지 않고, 실제 영상이 로드될 때 안내 문구만 감춥니다.
+            ytPlayerWrap.classList.remove('hidden');
+            ytPlayerWrap.classList.add('flex');
+            ytPlayerPlaceholder.classList.add('hidden');
+        }
 
-        function sendYoutubePlayerCommand(func) {
-            if (!ytPlayer) return;
-            if (func === 'playVideo') ytPlayer.playVideo();
-            else if (func === 'pauseVideo') ytPlayer.pauseVideo();
+        function hideYoutubePlayer(message = '재생이 끝났습니다. 새 음원을 선택하면 이 화면에서 다시 재생됩니다.') {
+            // iframe 영상만 종료하고 16:9 화면 틀은 그대로 남겨둡니다.
+            ytPlayerFrame.src = 'about:blank';
+            ytPlayerWrap.classList.remove('hidden');
+            ytPlayerWrap.classList.add('flex');
+            ytPlayerPlaceholderTitle.textContent = '유튜브 화면';
+            ytPlayerPlaceholderMessage.textContent = message;
+            ytPlayerPlaceholder.classList.remove('hidden');
+        }
+
+        function clearYoutubeTrackAfterEnd() {
+            isYoutubePlaying = false;
+            savedYoutubeVideoId = '';
+            savedYoutubeTitle = '';
+            savedYoutubeChannel = '';
+            youtubeUrlInput.value = '';
+            localStorage.removeItem(STORAGE_KEYS.YOUTUBE_URL);
+            ytOpenOriginal.href = 'https://www.youtube.com/';
+            hideYoutubePlayer('노래가 끝났습니다. 링크는 초기화되었고, 다른 음원을 선택하면 다시 표시됩니다.');
+            updateYoutubeControlsState();
+            updateYoutubeMetaCard();
         }
 
         function stopYoutubePlayback() {
-            // iframe을 제거하지 않고 일시정지해야 재생 위치가 유지됩니다.
             sendYoutubePlayerCommand('pauseVideo');
             isYoutubePlaying = false;
             updateYoutubeControlsState();
             updateYoutubeMetaCard();
+        }
+
+        function loadYoutubePlayer(autoplay = true) {
+            if (!savedYoutubeVideoId) return;
+            showYoutubePlayer();
+            const nextSrc = buildYoutubeEmbedUrl(autoplay);
+            const currentSrc = ytPlayerFrame.getAttribute('src') || '';
+            if (currentSrc !== nextSrc) {
+                ytPlayerFrame.src = nextSrc;
+            } else if (autoplay) {
+                sendYoutubePlayerCommand('playVideo');
+            } else {
+                sendYoutubePlayerCommand('pauseVideo');
+            }
         }
 
         function startYoutubePlayback() {
@@ -1771,25 +1921,8 @@
                 youtubeUrlInput.focus();
                 return;
             }
-
             isYoutubePlaying = true;
-            if (youtubePlaylist.length && currentPlaylistIndex < 0) {
-                const foundIndex = youtubePlaylist.findIndex(item => item.id === savedYoutubeVideoId);
-                currentPlaylistIndex = foundIndex >= 0 ? foundIndex : 0;
-                if (foundIndex < 0) {
-                    savedYoutubeVideoId = youtubePlaylist[0].id;
-                    const firstTrack = youtubePlaylist[0];
-                    youtubeUrlInput.value = firstTrack.url;
-                    fetchYoutubeMetadata(firstTrack.id, firstTrack.url);
-                }
-            }
-            if (ytPlayer) {
-                const currentData = ytPlayer.getVideoData ? ytPlayer.getVideoData() : null;
-                if (!currentData || currentData.video_id !== savedYoutubeVideoId) ytPlayer.loadVideoById(savedYoutubeVideoId);
-                else ytPlayer.playVideo();
-            } else {
-                createYoutubePlayer(savedYoutubeVideoId);
-            }
+            loadYoutubePlayer(true);
             updateYoutubeControlsState();
             updateYoutubeMetaCard();
         }
@@ -1804,7 +1937,7 @@
                 btnYtToggle.disabled = true;
                 btnYtToggle.textContent = '링크 먼저 적용';
                 btnYtToggle.className = 'px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm bg-slate-800 text-slate-500 border border-slate-700 transition-all opacity-50 cursor-not-allowed whitespace-nowrap';
-                ytHelperText.textContent = '* 유튜브 링크를 입력하고 [링크 적용]을 누르면 노래 제목을 불러와 주행 중에 음원만 틀어드립니다.';
+                ytHelperText.textContent = '* 유튜브 링크를 적용하면 제목이 표시됩니다. 주행 중 음원을 재생할 수 있습니다.';
                 return;
             }
 
@@ -1813,28 +1946,88 @@
                 if (isYoutubePlaying) {
                     btnYtToggle.textContent = '음원 끄기';
                     btnYtToggle.className = 'px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm bg-rose-600 hover:bg-rose-500 text-white transition-all cursor-pointer whitespace-nowrap shadow-md shadow-rose-600/20';
-                    ytHelperText.textContent = '🎵 주행 중 음원을 재생 중입니다. 정차하거나 쉬는시간이 되면 자동으로 멈춥니다.';
+                    ytHelperText.textContent = isYoutubeRepeatEnabled
+                        ? '🎵 반복 재생 중입니다. 정차하면 일시정지되고, 곡이 끝나면 반복됩니다.'
+                        : '🎵 주행 중 음원을 재생 중입니다. 곡이 끝나면 링크와 플레이어가 자동으로 정리됩니다.';
                 } else {
                     btnYtToggle.textContent = '음원 재생';
                     btnYtToggle.className = 'px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm bg-taxi-500 hover:bg-taxi-600 text-white transition-all cursor-pointer whitespace-nowrap shadow-md shadow-taxi-500/20';
-                    ytHelperText.textContent = '✅ 노래 제목을 불러왔습니다. [음원 재생]을 누르거나 주행 중 음원을 재생할 수 있습니다!';
+                    ytHelperText.textContent = '✅ 음원 준비 완료. [음원 재생]을 눌러 재생하세요.';
                 }
             } else {
                 btnYtToggle.disabled = true;
                 btnYtToggle.textContent = '주행 중 재생';
                 btnYtToggle.className = 'px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm bg-slate-800 text-slate-500 border border-slate-700 transition-all opacity-50 cursor-not-allowed whitespace-nowrap';
-                ytHelperText.textContent = '* 노래 제목을 불러왔습니다. 탑승 버튼을 누르면 주행 중에 음원을 틀어드립니다.';
+                ytHelperText.textContent = '* 노래가 준비되었습니다. 탑승 버튼을 누른 뒤 음원 재생을 눌러주세요.';
             }
         }
+
+        // YouTube iframe의 onStateChange 이벤트에서 0은 영상 종료(ENDED)입니다.
+        window.addEventListener('message', (event) => {
+            if (event.origin !== 'https://www.youtube.com' && event.origin !== 'https://www.youtube-nocookie.com') return;
+            let data = event.data;
+            if (typeof data === 'string') {
+                try { data = JSON.parse(data); } catch (err) { return; }
+            }
+            if (!data || !isYoutubePlaying) return;
+
+            let playerState = null;
+            if (data.event === 'onStateChange') {
+                playerState = Number(data.info);
+            } else if (data.event === 'infoDelivery' && data.info && data.info.playerState !== undefined) {
+                playerState = Number(data.info.playerState);
+            }
+            if (playerState === 0) {
+                if (isYoutubeRepeatEnabled) {
+                    // 반복 파라미터가 적용되지 않는 환경에서도 끝나는 즉시 처음부터 다시 재생합니다.
+                    sendYoutubePlayerCommand('seekTo', [0, true]);
+                    sendYoutubePlayerCommand('playVideo');
+                } else {
+                    clearYoutubeTrackAfterEnd();
+                }
+            }
+        });
+
+        ytPlayerFrame.addEventListener('load', () => {
+            const frameSrc = ytPlayerFrame.getAttribute('src') || '';
+            // about:blank 플레이어 대기 화면을 로드했을 때는 YouTube API 초기화를 건너뜁니다.
+            if (!savedYoutubeVideoId || !frameSrc.includes('/embed/')) return;
+            window.setTimeout(() => {
+                // 플레이어 이벤트 수신을 등록한 뒤 영상 상태 변화를 감지합니다.
+                ytPlayerFrame.contentWindow.postMessage(JSON.stringify({
+                    event: 'listening',
+                    id: 'taxi-timer-youtube-player'
+                }), 'https://www.youtube.com');
+                sendYoutubePlayerCommand('addEventListener', ['onStateChange']);
+                applyYoutubeVolume();
+                sendYoutubePlayerCommand(isYoutubePlaying ? 'playVideo' : 'pauseVideo');
+            }, 500);
+        });
+
+        ytVolumeSlider.addEventListener('input', applyYoutubeVolume);
+
+        btnYtRepeat.addEventListener('click', () => {
+            isYoutubeRepeatEnabled = !isYoutubeRepeatEnabled;
+            try {
+                localStorage.setItem(STORAGE_KEYS.YOUTUBE_REPEAT, String(isYoutubeRepeatEnabled));
+            } catch (err) {}
+            updateYoutubeRepeatButton();
+
+            // 이미 플레이어가 열려 있으면 바뀐 반복 설정을 즉시 적용합니다.
+            if (savedYoutubeVideoId && ytPlayerFrame.getAttribute('src')) {
+                loadYoutubePlayer(isYoutubePlaying);
+            }
+        });
 
         btnYtApply.addEventListener('click', async () => {
             const rawUrl = youtubeUrlInput.value.trim();
             if (!rawUrl) {
+                isYoutubePlaying = false;
                 savedYoutubeVideoId = '';
                 savedYoutubeTitle = '';
                 savedYoutubeChannel = '';
                 localStorage.removeItem(STORAGE_KEYS.YOUTUBE_URL);
-                stopYoutubePlayback();
+                hideYoutubePlayer('유튜브 링크를 입력하면 이 화면에서 재생할 수 있습니다.');
                 updateYoutubeControlsState();
                 updateYoutubeMetaCard();
                 return;
@@ -1847,20 +2040,27 @@
             }
 
             savedYoutubeVideoId = videoId;
-            currentPlaylistIndex = youtubePlaylist.findIndex(item => item.id === videoId);
-            renderYoutubePlaylist();
-            if (ytOpenOriginal) ytOpenOriginal.href = `https://www.youtube.com/watch?v=${videoId}`;
+            savedYoutubeTitle = '노래 제목을 불러오는 중...';
+            savedYoutubeChannel = '';
+            ytOpenOriginal.href = `https://www.youtube.com/watch?v=${videoId}`;
             try {
                 localStorage.setItem(STORAGE_KEYS.YOUTUBE_URL, rawUrl);
             } catch (err) {}
 
             await fetchYoutubeMetadata(videoId, rawUrl);
-
             if (isRunning) {
                 startYoutubePlayback();
             } else {
                 updateYoutubeControlsState();
-                showModal('음원 불러오기 완료 🎵', `"${savedYoutubeTitle}" 음원 정보를 불러왔습니다. 탑승 버튼을 눌러 주행을 시작하면 음원을 재생할 수 있습니다!`);
+                showModal('음원 불러오기 완료 🎵', `"${savedYoutubeTitle}" 음원 정보를 불러왔습니다. 탑승 버튼을 누른 뒤 재생할 수 있습니다!`);
+            }
+        });
+
+        // 메인 링크 입력창에서도 엔터를 누르면 링크 적용을 실행합니다.
+        youtubeUrlInput.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                btnYtApply.click();
             }
         });
 
@@ -1872,37 +2072,37 @@
             }
         });
 
-        btnYtRepeat.addEventListener('click', () => {
-            repeatCurrentTrack = !repeatCurrentTrack;
-            btnYtRepeat.textContent = repeatCurrentTrack ? '↻ 반복 켜짐' : '↻ 반복 꺼짐';
-            btnYtRepeat.setAttribute('aria-pressed', String(repeatCurrentTrack));
-            btnYtRepeat.className = repeatCurrentTrack
-                ? 'px-3 py-2.5 rounded-xl font-bold text-xs sm:text-sm bg-taxi-500 text-white border border-taxi-500 whitespace-nowrap'
-                : 'px-3 py-2.5 rounded-xl font-bold text-xs sm:text-sm bg-slate-800 text-slate-300 border border-slate-700 hover:bg-slate-700 whitespace-nowrap';
-        });
+        function loadPlaylistTrack(track) {
+            if (!track || !track.videoId) return;
+            savedYoutubeVideoId = track.videoId;
+            savedYoutubeTitle = track.title || `음원 트랙 (${track.videoId})`;
+            savedYoutubeChannel = track.channel || '';
+            youtubeUrlInput.value = track.url || `https://www.youtube.com/watch?v=${track.videoId}`;
+            ytOpenOriginal.href = `https://www.youtube.com/watch?v=${track.videoId}`;
+            try {
+                localStorage.setItem(STORAGE_KEYS.YOUTUBE_URL, youtubeUrlInput.value);
+            } catch (err) {}
+            updateYoutubeControlsState();
+            updateYoutubeMetaCard();
+            switchTab('home');
+            if (isRunning) {
+                startYoutubePlayback();
+            } else {
+                showModal('음원 선택 완료 🎵', `"${savedYoutubeTitle}" 음원을 선택했습니다. 탑승 후 음원 재생 버튼을 눌러주세요!`);
+            }
+        }
 
-        // --- 초기 실행 (저장된 상태 불러오기) ---
+                // --- 초기 실행 (저장된 상태 불러오기) ---
         window.addEventListener('DOMContentLoaded', () => {
             loadFromStorage();
-            renderYoutubePlaylist();
-            youtubePlaylist.forEach(async track => {
-                if (!track.title) {
-                    const metadata = await getYoutubeMetadata(track.id, track.url);
-                    if (youtubePlaylist.includes(track)) {
-                        track.title = metadata.title;
-                        track.channel = metadata.channel;
-                        saveYoutubePlaylist();
-                        renderYoutubePlaylist();
-                    }
-                }
-            });
-            loadYoutubeApi();
             if (savedYoutubeVideoId) {
                 const initialUrl = `https://www.youtube.com/watch?v=${savedYoutubeVideoId}`;
                 youtubeUrlInput.value = initialUrl;
                 fetchYoutubeMetadata(savedYoutubeVideoId, initialUrl);
             }
             syncSettingsInputs();
+            renderPlaylistManager();
+            updateYoutubeRepeatButton();
             updateTimerUI();
             renderTasks();
             renderHistoryView();
