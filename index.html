@@ -123,6 +123,7 @@
             #yt-player-frame { max-width: min(100%, 380px); }
             #playlist-create-form button, #playlist-track-form button { min-height: 46px; }
             #playlist-select { width: 100%; }
+            #btn-play-playlist { min-height: 42px; }
             #yt-now-playing-card { align-items: flex-start; }
             input, select, textarea, button { max-width: 100%; }
             input[type="range"] { accent-color: #f97316; }
@@ -533,9 +534,12 @@
                     </form>
 
                     <div class="border-t border-slate-800 pt-3 space-y-2">
-                        <div class="flex items-center justify-between gap-2">
+                        <div class="flex items-center justify-between gap-2 flex-wrap">
                             <h3 class="text-sm font-bold text-white">등록된 음원</h3>
-                            <span id="playlist-track-count" class="text-xs text-taxi-400 font-bold">0곡</span>
+                            <div class="flex items-center gap-2">
+                                <span id="playlist-track-count" class="text-xs text-taxi-400 font-bold">0곡</span>
+                                <button id="btn-play-playlist" type="button" disabled class="shrink-0 px-3 py-2 rounded-lg bg-taxi-500 hover:bg-taxi-600 disabled:bg-slate-800 disabled:text-slate-500 text-white text-xs font-bold disabled:cursor-not-allowed">▶ 플레이리스트 재생</button>
+                            </div>
                         </div>
                         <ul id="playlist-track-list" class="space-y-2"></ul>
                     </div>
@@ -618,6 +622,15 @@
         let youtubePlaylists = [];
         let activePlaylistId = null;
         let isYoutubeRepeatEnabled = false;
+        // 플레이리스트 순차 재생 상태
+        let playlistPlayback = {
+            active: false,
+            playlistId: null,
+            currentIndex: -1,
+            currentTrackId: null,
+            advancing: false,
+            hasStarted: false
+        };
 
         // --- 로컬 저장소 저장 및 불러오기 함수 ---
         function saveTasksToStorage() {
@@ -807,6 +820,7 @@
         const btnAddPlaylistTrack = document.getElementById('btn-add-playlist-track');
         const playlistTrackList = document.getElementById('playlist-track-list');
         const playlistTrackCount = document.getElementById('playlist-track-count');
+        const btnPlayPlaylist = document.getElementById('btn-play-playlist');
 
         // --- 설정 폼 동기화 및 저장 제어 ---
         function syncSettingsInputs() {
@@ -831,6 +845,20 @@
             return youtubePlaylists.find(list => String(list.id) === String(activePlaylistId)) || null;
         }
 
+        function updatePlaylistPlaybackButton() {
+            const activeList = getActivePlaylist();
+            const hasTracks = !!(activeList && Array.isArray(activeList.tracks) && activeList.tracks.length);
+            btnPlayPlaylist.disabled = !hasTracks;
+
+            if (playlistPlayback.active && String(playlistPlayback.playlistId) === String(activePlaylistId)) {
+                btnPlayPlaylist.textContent = isYoutubePlaying ? '■ 재생 중지' : '▶ 이어 재생';
+                btnPlayPlaylist.className = 'shrink-0 px-3 py-2 rounded-lg bg-rose-600 hover:bg-rose-500 disabled:bg-slate-800 disabled:text-slate-500 text-white text-xs font-bold disabled:cursor-not-allowed';
+            } else {
+                btnPlayPlaylist.textContent = '▶ 플레이리스트 재생';
+                btnPlayPlaylist.className = 'shrink-0 px-3 py-2 rounded-lg bg-taxi-500 hover:bg-taxi-600 disabled:bg-slate-800 disabled:text-slate-500 text-white text-xs font-bold disabled:cursor-not-allowed';
+            }
+        }
+
         function renderPlaylistManager() {
             const activeList = getActivePlaylist();
             playlistSelect.innerHTML = '';
@@ -847,6 +875,7 @@
             if (!hasPlaylists) {
                 playlistTrackList.innerHTML = '';
                 playlistTrackCount.textContent = '0곡';
+                updatePlaylistPlaybackButton();
                 return;
             }
 
@@ -857,6 +886,7 @@
 
             if (!tracks.length) {
                 playlistTrackList.innerHTML = '<li class="text-center py-5 text-xs text-slate-500 bg-navy-950/50 rounded-xl border border-dashed border-slate-800">아직 등록된 음원이 없습니다. 위 링크 입력창에 유튜브 링크를 넣어주세요.</li>';
+                updatePlaylistPlaybackButton();
                 return;
             }
 
@@ -887,6 +917,9 @@
                 deleteBtn.addEventListener('click', () => {
                     const list = getActivePlaylist();
                     if (!list) return;
+                    if (playlistPlayback.active && String(playlistPlayback.playlistId) === String(list.id) && String(playlistPlayback.currentTrackId) === String(track.id)) {
+                        stopPlaylistPlayback();
+                    }
                     list.tracks = list.tracks.filter(item => item.id !== track.id);
                     savePlaylistsToStorage();
                     renderPlaylistManager();
@@ -895,6 +928,7 @@
                 li.append(info, playBtn, deleteBtn);
                 playlistTrackList.appendChild(li);
             });
+            updatePlaylistPlaybackButton();
         }
 
         playlistCreateForm.addEventListener('submit', (e) => {
@@ -910,6 +944,9 @@
         });
 
         playlistSelect.addEventListener('change', () => {
+            if (playlistPlayback.active && String(playlistPlayback.playlistId) !== String(playlistSelect.value)) {
+                stopPlaylistPlayback();
+            }
             activePlaylistId = playlistSelect.value;
             savePlaylistsToStorage();
             renderPlaylistManager();
@@ -919,6 +956,9 @@
             const activeList = getActivePlaylist();
             if (!activeList) return;
             showModal('플레이리스트 삭제', `“${activeList.name}” 플레이리스트를 삭제할까요? 등록된 음원도 함께 삭제됩니다.`, true, () => {
+                if (playlistPlayback.active && String(playlistPlayback.playlistId) === String(activePlaylistId)) {
+                    stopPlaylistPlayback();
+                }
                 youtubePlaylists = youtubePlaylists.filter(list => String(list.id) !== String(activePlaylistId));
                 activePlaylistId = youtubePlaylists.length ? youtubePlaylists[0].id : null;
                 savePlaylistsToStorage();
@@ -1743,6 +1783,7 @@
         const ytVolumeValue = document.getElementById('yt-volume-value');
         const ytOpenOriginal = document.getElementById('yt-open-original');
         let isYoutubePlaying = false;
+        let youtubeHasStarted = false;
         let savedYoutubeTitle = '';
         let savedYoutubeChannel = '';
 
@@ -1832,7 +1873,7 @@
                 origin: window.location.origin
             });
             // YouTube 단일 영상 반복 재생은 loop=1과 playlist=영상 ID를 함께 지정해야 합니다.
-            if (isYoutubeRepeatEnabled) {
+            if (isYoutubeRepeatEnabled && !playlistPlayback.active) {
                 params.set('loop', '1');
                 params.set('playlist', savedYoutubeVideoId);
             }
@@ -1871,6 +1912,7 @@
 
         function clearYoutubeTrackAfterEnd() {
             isYoutubePlaying = false;
+            youtubeHasStarted = false;
             savedYoutubeVideoId = '';
             savedYoutubeTitle = '';
             savedYoutubeChannel = '';
@@ -1895,6 +1937,7 @@
             const nextSrc = buildYoutubeEmbedUrl(autoplay);
             const currentSrc = ytPlayerFrame.getAttribute('src') || '';
             if (currentSrc !== nextSrc) {
+                youtubeHasStarted = false;
                 ytPlayerFrame.src = nextSrc;
             } else if (autoplay) {
                 sendYoutubePlayerCommand('playVideo');
@@ -1930,6 +1973,7 @@
                 btnYtToggle.textContent = '링크 먼저 적용';
                 btnYtToggle.className = 'px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm bg-slate-800 text-slate-500 border border-slate-700 transition-all opacity-50 cursor-not-allowed whitespace-nowrap';
                 ytHelperText.textContent = '* 유튜브 링크를 적용하면 제목이 표시됩니다. 주행 중 음원을 재생할 수 있습니다.';
+                updatePlaylistPlaybackButton();
                 return;
             }
 
@@ -1938,9 +1982,11 @@
                 if (isYoutubePlaying) {
                     btnYtToggle.textContent = '음원 끄기';
                     btnYtToggle.className = 'px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm bg-rose-600 hover:bg-rose-500 text-white transition-all cursor-pointer whitespace-nowrap shadow-md shadow-rose-600/20';
-                    ytHelperText.textContent = isYoutubeRepeatEnabled
-                        ? '🎵 반복 재생 중입니다. 정차하면 일시정지되고, 곡이 끝나면 반복됩니다.'
-                        : '🎵 주행 중 음원을 재생 중입니다. 곡이 끝나면 링크와 플레이어가 자동으로 정리됩니다.';
+                    ytHelperText.textContent = playlistPlayback.active
+                        ? '🎶 플레이리스트를 순서대로 재생 중입니다. 곡이 끝나면 다음 음원으로 자동 이동합니다.'
+                        : (isYoutubeRepeatEnabled
+                            ? '🎵 반복 재생 중입니다. 정차하면 일시정지되고, 곡이 끝나면 반복됩니다.'
+                            : '🎵 주행 중 음원을 재생 중입니다. 곡이 끝나면 링크와 플레이어가 자동으로 정리됩니다.');
                 } else {
                     btnYtToggle.textContent = '음원 재생';
                     btnYtToggle.className = 'px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm bg-taxi-500 hover:bg-taxi-600 text-white transition-all cursor-pointer whitespace-nowrap shadow-md shadow-taxi-500/20';
@@ -1950,8 +1996,11 @@
                 btnYtToggle.disabled = true;
                 btnYtToggle.textContent = '주행 중 재생';
                 btnYtToggle.className = 'px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm bg-slate-800 text-slate-500 border border-slate-700 transition-all opacity-50 cursor-not-allowed whitespace-nowrap';
-                ytHelperText.textContent = '* 노래가 준비되었습니다. 탑승 버튼을 누른 뒤 음원 재생을 눌러주세요.';
+                ytHelperText.textContent = playlistPlayback.active
+                    ? '* 플레이리스트가 일시정지되었습니다. 탑승 후 [이어 재생]을 눌러주세요.'
+                    : '* 노래가 준비되었습니다. 탑승 버튼을 누른 뒤 음원 재생을 눌러주세요.';
             }
+            updatePlaylistPlaybackButton();
         }
 
         // YouTube iframe의 onStateChange 이벤트에서 0은 영상 종료(ENDED)입니다.
@@ -1969,9 +2018,15 @@
             } else if (data.event === 'infoDelivery' && data.info && data.info.playerState !== undefined) {
                 playerState = Number(data.info.playerState);
             }
-            if (playerState === 0) {
-                if (isYoutubeRepeatEnabled) {
-                    // 반복 파라미터가 적용되지 않는 환경에서도 끝나는 즉시 처음부터 다시 재생합니다.
+            if (playerState === 1) {
+                youtubeHasStarted = true;
+            } else if (playerState === 0 && youtubeHasStarted) {
+                youtubeHasStarted = false;
+                if (playlistPlayback.active) {
+                    // 플레이리스트 재생 중에는 반복 설정보다 다음 곡 순서를 우선합니다.
+                    advancePlaylistPlayback();
+                } else if (isYoutubeRepeatEnabled) {
+                    // 단일 음원 재생 중에는 현재 곡을 반복합니다.
                     sendYoutubePlayerCommand('seekTo', [0, true]);
                     sendYoutubePlayerCommand('playVideo');
                 } else {
@@ -1992,6 +2047,8 @@
                 }), 'https://www.youtube.com');
                 sendYoutubePlayerCommand('addEventListener', ['onStateChange']);
                 applyYoutubeVolume();
+                playlistPlayback.advancing = false;
+                updatePlaylistPlaybackButton();
                 sendYoutubePlayerCommand(isYoutubePlaying ? 'playVideo' : 'pauseVideo');
             }, 500);
         });
@@ -2005,13 +2062,15 @@
             } catch (err) {}
             updateYoutubeRepeatButton();
 
-            // 이미 플레이어가 열려 있으면 바뀐 반복 설정을 즉시 적용합니다.
-            if (savedYoutubeVideoId && ytPlayerFrame.getAttribute('src')) {
+            // 플레이리스트 재생 중에는 다음 곡 자동 이동이 우선이므로 단일 곡 반복을 적용하지 않습니다.
+            if (!playlistPlayback.active && savedYoutubeVideoId && ytPlayerFrame.getAttribute('src')) {
                 loadYoutubePlayer(isYoutubePlaying);
             }
         });
 
         btnYtApply.addEventListener('click', async () => {
+            // 메인 링크를 직접 적용하면 플레이리스트 순차 재생 모드에서 벗어납니다.
+            if (playlistPlayback.active) stopPlaylistPlayback();
             const rawUrl = youtubeUrlInput.value.trim();
             if (!rawUrl) {
                 isYoutubePlaying = false;
@@ -2058,14 +2117,152 @@
 
         btnYtToggle.addEventListener('click', () => {
             if (isYoutubePlaying) {
-                stopYoutubePlayback();
+                if (playlistPlayback.active) stopPlaylistPlayback();
+                else stopYoutubePlayback();
+            } else if (playlistPlayback.active) {
+                resumePlaylistPlayback();
             } else {
                 startYoutubePlayback();
             }
         });
 
+        function finishPlaylistPlayback() {
+            playlistPlayback.active = false;
+            playlistPlayback.playlistId = null;
+            playlistPlayback.currentIndex = -1;
+            playlistPlayback.currentTrackId = null;
+            playlistPlayback.advancing = false;
+            playlistPlayback.hasStarted = false;
+            clearYoutubeTrackAfterEnd();
+            ytHelperText.textContent = '✅ 플레이리스트의 모든 음원을 순서대로 재생했습니다.';
+            updatePlaylistPlaybackButton();
+        }
+
+        function stopPlaylistPlayback() {
+            if (isYoutubePlaying) {
+                sendYoutubePlayerCommand('pauseVideo');
+            }
+            playlistPlayback.active = false;
+            playlistPlayback.playlistId = null;
+            playlistPlayback.currentIndex = -1;
+            playlistPlayback.currentTrackId = null;
+            playlistPlayback.advancing = false;
+            playlistPlayback.hasStarted = false;
+            isYoutubePlaying = false;
+            updateYoutubeControlsState();
+            updateYoutubeMetaCard();
+            updatePlaylistPlaybackButton();
+        }
+
+        function playPlaylistTrackAt(index) {
+            const list = youtubePlaylists.find(item => String(item.id) === String(playlistPlayback.playlistId));
+            const track = list && Array.isArray(list.tracks) ? list.tracks[index] : null;
+            if (!track || !track.videoId) {
+                finishPlaylistPlayback();
+                return;
+            }
+
+            playlistPlayback.currentIndex = index;
+            playlistPlayback.currentTrackId = track.id;
+            playlistPlayback.hasStarted = false;
+
+            savedYoutubeVideoId = track.videoId;
+            savedYoutubeTitle = track.title || `음원 트랙 (${track.videoId})`;
+            savedYoutubeChannel = track.channel || '';
+            youtubeUrlInput.value = track.url || `https://www.youtube.com/watch?v=${track.videoId}`;
+            ytOpenOriginal.href = `https://www.youtube.com/watch?v=${track.videoId}`;
+            isYoutubePlaying = true;
+            try {
+                localStorage.setItem(STORAGE_KEYS.YOUTUBE_URL, youtubeUrlInput.value);
+            } catch (err) {}
+
+            showYoutubePlayer();
+            loadYoutubePlayer(true);
+            updateYoutubeControlsState();
+            updateYoutubeMetaCard();
+            updatePlaylistPlaybackButton();
+        }
+
+        function advancePlaylistPlayback() {
+            if (!playlistPlayback.active || playlistPlayback.advancing) return;
+            playlistPlayback.advancing = true;
+
+            const list = youtubePlaylists.find(item => String(item.id) === String(playlistPlayback.playlistId));
+            if (!list || !Array.isArray(list.tracks)) {
+                finishPlaylistPlayback();
+                return;
+            }
+
+            // 재생 도중 목록에서 곡이 삭제된 경우에도 현재 곡 다음 항목으로 이어갑니다.
+            const currentIndex = list.tracks.findIndex(track => String(track.id) === String(playlistPlayback.currentTrackId));
+            const nextIndex = currentIndex >= 0 ? currentIndex + 1 : Math.max(0, playlistPlayback.currentIndex);
+            if (nextIndex >= list.tracks.length) {
+                finishPlaylistPlayback();
+                return;
+            }
+            playPlaylistTrackAt(nextIndex);
+        }
+
+        function startPlaylistPlayback() {
+            const list = getActivePlaylist();
+            if (!list || !Array.isArray(list.tracks) || list.tracks.length === 0) {
+                showModal('재생할 음원이 없습니다 🎵', '플레이리스트에 음원을 먼저 등록해주세요.');
+                return;
+            }
+            if (!isRunning) {
+                showModal('주행 중 전용 기능 🎵', '플레이리스트 재생은 탑승(공부 시작) 후 사용할 수 있습니다.');
+                return;
+            }
+
+            if (isYoutubePlaying) sendYoutubePlayerCommand('pauseVideo');
+            playlistPlayback.active = true;
+            playlistPlayback.playlistId = list.id;
+            playlistPlayback.currentIndex = -1;
+            playlistPlayback.currentTrackId = null;
+            playlistPlayback.advancing = false;
+            playlistPlayback.hasStarted = false;
+            switchTab('home');
+            playPlaylistTrackAt(0);
+        }
+
+        function resumePlaylistPlayback() {
+            if (!playlistPlayback.active) {
+                startPlaylistPlayback();
+                return;
+            }
+            if (!isRunning) {
+                showModal('주행 중 전용 기능 🎵', '탑승(공부 시작) 후 [이어 재생]을 눌러주세요.');
+                return;
+            }
+            const list = youtubePlaylists.find(item => String(item.id) === String(playlistPlayback.playlistId));
+            if (!list || !list.tracks.length) {
+                finishPlaylistPlayback();
+                return;
+            }
+            if (!playlistPlayback.currentTrackId || !list.tracks.some(track => String(track.id) === String(playlistPlayback.currentTrackId))) {
+                playPlaylistTrackAt(0);
+                return;
+            }
+            isYoutubePlaying = true;
+            loadYoutubePlayer(true);
+            updateYoutubeControlsState();
+            updateYoutubeMetaCard();
+            updatePlaylistPlaybackButton();
+        }
+
+        btnPlayPlaylist.addEventListener('click', () => {
+            if (playlistPlayback.active) {
+                if (isYoutubePlaying) stopPlaylistPlayback();
+                else resumePlaylistPlayback();
+            } else {
+                startPlaylistPlayback();
+            }
+        });
+
         function loadPlaylistTrack(track) {
             if (!track || !track.videoId) return;
+            // 개별 음원을 선택하면 플레이리스트 자동 넘김 모드는 종료합니다.
+            if (playlistPlayback.active) stopPlaylistPlayback();
             savedYoutubeVideoId = track.videoId;
             savedYoutubeTitle = track.title || `음원 트랙 (${track.videoId})`;
             savedYoutubeChannel = track.channel || '';
