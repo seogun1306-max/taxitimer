@@ -115,6 +115,10 @@
             #btn-noise-toggle, #btn-yt-apply, #btn-yt-toggle { min-height: 44px; }
             #youtube-url-input { width: 100%; min-width: 0; min-height: 46px; font-size: 16px; }
             #btn-yt-apply, #btn-yt-toggle { flex: 1 1 0; padding-left: 10px; padding-right: 10px; }
+            /* 모바일에서 공부 목적지 입력창과 + 추가 버튼이 화면 밖으로 밀리지 않도록 */
+            #task-form { display: flex; flex-wrap: nowrap; align-items: stretch; gap: 8px; width: 100%; min-width: 0; box-sizing: border-box; }
+            #task-form #task-input { flex: 1 1 0%; width: 0; min-width: 0; max-width: 100%; box-sizing: border-box; }
+            #task-form button { flex: 0 0 auto; min-width: 64px; max-width: none; padding-left: 12px; padding-right: 12px; white-space: nowrap; box-sizing: border-box; }
             #btn-yt-repeat { min-height: 42px; }
             #yt-player-frame { max-width: min(100%, 380px); }
             #playlist-create-form button, #playlist-track-form button { min-height: 46px; }
@@ -390,16 +394,16 @@
                 </div>
 
                 <!-- 새 공부 항목 추가 폼 -->
-                <form id="task-form" class="flex gap-2">
+                <form id="task-form" class="flex min-w-0 w-full gap-2">
                     <input 
                         type="text" 
                         id="task-input" 
                         maxlength="40"
                         placeholder="예: 수학 문제집 2단원 풀기" 
-                        class="flex-grow bg-navy-950 border border-slate-700 focus:border-taxi-500 focus:outline-none rounded-xl px-4 py-3 text-sm text-white placeholder-slate-500 transition-colors"
+                        class="min-w-0 w-0 flex-1 bg-navy-950 border border-slate-700 focus:border-taxi-500 focus:outline-none rounded-xl px-4 py-3 text-sm text-white placeholder-slate-500 transition-colors box-border"
                         required
                     >
-                    <button type="submit" class="bg-taxi-500 hover:bg-taxi-600 active:scale-95 text-white font-bold px-5 py-3 rounded-xl text-sm transition-all cursor-pointer whitespace-nowrap">
+                    <button type="submit" class="shrink-0 bg-taxi-500 hover:bg-taxi-600 active:scale-95 text-white font-bold px-3 sm:px-5 py-3 rounded-xl text-sm transition-all cursor-pointer whitespace-nowrap box-border">
                         + 추가
                     </button>
                 </form>
