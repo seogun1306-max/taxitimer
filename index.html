@@ -370,11 +370,6 @@
                                     allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
                                     allowfullscreen
                                 ></iframe>
-                                <div id="yt-player-placeholder" class="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-slate-950 text-center px-4">
-                                    <span class="text-3xl" aria-hidden="true">▶️</span>
-                                    <p id="yt-player-placeholder-title" class="text-sm font-bold text-slate-200">유튜브 화면</p>
-                                    <p id="yt-player-placeholder-message" class="text-xs text-slate-400">링크를 적용하고 주행 중 음원을 재생하면 여기에 표시됩니다.</p>
-                                </div>
                             </div>
                         </div>
                         <p class="text-[10px] leading-relaxed text-slate-500">광고 건너뛰기는 유튜브가 허용했을 때 영상 화면 안에 표시됩니다.</p>
@@ -1740,9 +1735,6 @@
         const ytLiveBadge = document.getElementById('yt-live-badge');
         const ytPlayerFrame = document.getElementById('yt-player-frame');
         const ytPlayerWrap = document.getElementById('yt-player-wrap');
-        const ytPlayerPlaceholder = document.getElementById('yt-player-placeholder');
-        const ytPlayerPlaceholderTitle = document.getElementById('yt-player-placeholder-title');
-        const ytPlayerPlaceholderMessage = document.getElementById('yt-player-placeholder-message');
         const ytVolumeSlider = document.getElementById('yt-volume');
         const ytVolumeValue = document.getElementById('yt-volume-value');
         const ytOpenOriginal = document.getElementById('yt-open-original');
@@ -1861,20 +1853,16 @@
         }
 
         function showYoutubePlayer() {
-            // 화면 영역은 숨기지 않고, 실제 영상이 로드될 때 안내 문구만 감춥니다.
+            // 안내 문구 없이 유튜브 영상 영역만 유지합니다.
             ytPlayerWrap.classList.remove('hidden');
             ytPlayerWrap.classList.add('flex');
-            ytPlayerPlaceholder.classList.add('hidden');
         }
 
-        function hideYoutubePlayer(message = '재생이 끝났습니다. 새 음원을 선택하면 이 화면에서 다시 재생됩니다.') {
-            // iframe 영상만 종료하고 16:9 화면 틀은 그대로 남겨둡니다.
+        function hideYoutubePlayer() {
+            // 영상만 종료하고 16:9 유튜브 화면 틀은 검은 화면으로 계속 유지합니다.
             ytPlayerFrame.src = 'about:blank';
             ytPlayerWrap.classList.remove('hidden');
             ytPlayerWrap.classList.add('flex');
-            ytPlayerPlaceholderTitle.textContent = '유튜브 화면';
-            ytPlayerPlaceholderMessage.textContent = message;
-            ytPlayerPlaceholder.classList.remove('hidden');
         }
 
         function clearYoutubeTrackAfterEnd() {
@@ -1885,7 +1873,7 @@
             youtubeUrlInput.value = '';
             localStorage.removeItem(STORAGE_KEYS.YOUTUBE_URL);
             ytOpenOriginal.href = 'https://www.youtube.com/';
-            hideYoutubePlayer('노래가 끝났습니다. 링크는 초기화되었고, 다른 음원을 선택하면 다시 표시됩니다.');
+            hideYoutubePlayer();
             updateYoutubeControlsState();
             updateYoutubeMetaCard();
         }
@@ -2027,7 +2015,7 @@
                 savedYoutubeTitle = '';
                 savedYoutubeChannel = '';
                 localStorage.removeItem(STORAGE_KEYS.YOUTUBE_URL);
-                hideYoutubePlayer('유튜브 링크를 입력하면 이 화면에서 재생할 수 있습니다.');
+                hideYoutubePlayer();
                 updateYoutubeControlsState();
                 updateYoutubeMetaCard();
                 return;
