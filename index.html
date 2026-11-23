@@ -347,7 +347,7 @@
                         * 주행(공부) 중일 때만 유튜브 영상/노래를 재생할 수 있으며, 정차하거나 쉬는시간이 되면 자동으로 멈춥니다.
                     </p>
                     <!-- 재생 정보와 유튜브 미리보기를 하나의 카드로 통합 -->
-                    <div class="rounded-xl border border-slate-800 bg-navy-950 p-3 space-y-2">
+                    <div id="yt-preview-card" class="hidden rounded-xl border border-slate-800 bg-navy-950 p-3 space-y-2">
                         <div class="flex items-center justify-between gap-2">
                             <div id="yt-now-playing-card" class="hidden flex-1 items-center justify-between gap-3 min-w-0 py-1">
                                 <div class="flex items-center gap-2.5 min-w-0">
@@ -364,8 +364,8 @@
                                 유튜브에서 열기 ↗
                             </a>
                         </div>
-                        <!-- 유튜브 화면 영역은 항상 유지하고, 재생 종료 시에는 검은 대기 화면으로 전환합니다. -->
-                        <div id="yt-player-wrap" class="flex w-full justify-center">
+                        <!-- 음원이 준비되면 유튜브 화면을 표시하고, 재생이 끝나면 화면 영역도 숨깁니다. -->
+                        <div id="yt-player-wrap" class="hidden w-full justify-center">
                             <div id="yt-player-stage" class="relative w-full max-w-[380px] aspect-video overflow-hidden rounded-lg border border-slate-700 bg-black">
                                 <iframe
                                     id="yt-player-frame"
@@ -603,6 +603,8 @@
         let breakInterval = null;     // 쉬는시간 타이머 참조
         let activeTab = 'home';       // 현재 활성화된 탭 ('home' | 'history')
         let savedYoutubeVideoId = ''; // 저장된 유튜브 영상 ID
+        let screenWakeLockSentinel = null; // 모바일 화면 꺼짐 방지용 Wake Lock
+        let screenWakeLockRequest = null;
 
         // 실제 시계(Date.now) 기반 정밀 시간 측정을 위한 기준점 변수
         let runStartTimestamp = 0;
@@ -1153,6 +1155,55 @@
             }
         }
 
+        // 모바일 브라우저가 지원하면 타이머 작동 중 화면이 자동으로 꺼지지 않도록 유지합니다.
+        async function requestScreenWakeLock() {
+            if (!('wakeLock' in navigator) || document.visibilityState !== 'visible') return;
+            if (screenWakeLockSentinel && !screenWakeLockSentinel.released) return;
+            if (screenWakeLockRequest) return screenWakeLockRequest;
+
+            screenWakeLockRequest = (async () => {
+                try {
+                    const sentinel = await navigator.wakeLock.request('screen');
+                    // 요청을 기다리는 동안 사용자가 정차했거나 화면을 벗어났다면 즉시 해제합니다.
+                    if ((!isRunning && !isBreakTime) || document.visibilityState !== 'visible') {
+                        await sentinel.release();
+                        return;
+                    }
+                    screenWakeLockSentinel = sentinel;
+                    sentinel.addEventListener('release', () => {
+                        if (screenWakeLockSentinel === sentinel) screenWakeLockSentinel = null;
+                    });
+                } catch (error) {
+                    // 브라우저 미지원, 절전 정책, 권한 제한 등의 경우 기본 타이머 기능은 그대로 동작합니다.
+                    console.info('화면 켜짐 유지 기능을 사용할 수 없습니다:', error);
+                } finally {
+                    screenWakeLockRequest = null;
+                }
+            })();
+            return screenWakeLockRequest;
+        }
+
+        function releaseScreenWakeLock() {
+            const sentinel = screenWakeLockSentinel;
+            screenWakeLockSentinel = null;
+            if (sentinel && !sentinel.released) {
+                sentinel.release().catch(() => {});
+            }
+        }
+
+        function syncScreenWakeLock() {
+            if (isRunning || isBreakTime) requestScreenWakeLock();
+            else releaseScreenWakeLock();
+        }
+
+        // 다른 앱으로 이동했다가 돌아오면 브라우저가 해제한 Wake Lock을 다시 요청합니다.
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'visible' && (isRunning || isBreakTime)) {
+                requestScreenWakeLock();
+            }
+        });
+        window.addEventListener('pagehide', releaseScreenWakeLock);
+
         function stopBreakTimer() {
             if (breakInterval) {
                 clearInterval(breakInterval);
@@ -1172,6 +1223,7 @@
             saveTimerToStorage();
 
             isBreakTime = true;
+            syncScreenWakeLock();
             breakRemainingSeconds = BREAK_DURATION_SECONDS;
             breakEndTimestamp = Date.now() + BREAK_DURATION_SECONDS * 1000;
 
@@ -1226,6 +1278,7 @@
         }
 
         function setIdleStateUI() {
+            syncScreenWakeLock();
             btnStart.disabled = false;
             btnStart.classList.remove('opacity-50', 'cursor-not-allowed');
             btnPause.disabled = true;
@@ -1260,6 +1313,7 @@
             }
 
             isRunning = true;
+            syncScreenWakeLock();
             btnStart.disabled = true;
             btnStart.classList.add('opacity-50', 'cursor-not-allowed');
             
@@ -1310,6 +1364,7 @@
             updateTimerUI();
 
             isRunning = false;
+            syncScreenWakeLock();
             clearInterval(timerInterval);
             timerInterval = null;
             saveTimerToStorage();
@@ -1779,6 +1834,7 @@
         const ytLiveBadge = document.getElementById('yt-live-badge');
         const ytPlayerFrame = document.getElementById('yt-player-frame');
         const ytPlayerWrap = document.getElementById('yt-player-wrap');
+        const ytPreviewCard = document.getElementById('yt-preview-card');
         const ytVolumeSlider = document.getElementById('yt-volume');
         const ytVolumeValue = document.getElementById('yt-volume-value');
         const ytOpenOriginal = document.getElementById('yt-open-original');
@@ -1898,16 +1954,20 @@
         }
 
         function showYoutubePlayer() {
-            // 안내 문구 없이 유튜브 영상 영역만 유지합니다.
+            // 새 음원을 적용하거나 재생할 때 미리보기 카드와 영상 화면을 다시 표시합니다.
+            ytPreviewCard.classList.remove('hidden');
             ytPlayerWrap.classList.remove('hidden');
             ytPlayerWrap.classList.add('flex');
+            ytOpenOriginal.classList.remove('hidden');
         }
 
         function hideYoutubePlayer() {
-            // 영상만 종료하고 16:9 유튜브 화면 틀은 검은 화면으로 계속 유지합니다.
+            // 반복이 꺼진 단일 음원이 끝나면 영상 프레임과 유튜브 링크 영역을 함께 숨깁니다.
             ytPlayerFrame.src = 'about:blank';
-            ytPlayerWrap.classList.remove('hidden');
-            ytPlayerWrap.classList.add('flex');
+            ytPlayerWrap.classList.add('hidden');
+            ytPlayerWrap.classList.remove('flex');
+            ytPreviewCard.classList.add('hidden');
+            ytOpenOriginal.classList.add('hidden');
         }
 
         function clearYoutubeTrackAfterEnd() {
@@ -1983,7 +2043,9 @@
                     btnYtToggle.textContent = '음원 끄기';
                     btnYtToggle.className = 'px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm bg-rose-600 hover:bg-rose-500 text-white transition-all cursor-pointer whitespace-nowrap shadow-md shadow-rose-600/20';
                     ytHelperText.textContent = playlistPlayback.active
-                        ? '🎶 플레이리스트를 순서대로 재생 중입니다. 곡이 끝나면 다음 음원으로 자동 이동합니다.'
+                        ? (isYoutubeRepeatEnabled
+                            ? '🔁 플레이리스트 반복 재생 중입니다. 마지막 곡이 끝나면 첫 곡부터 다시 재생합니다.'
+                            : '🎶 플레이리스트를 순서대로 재생 중입니다. 마지막 곡이 끝나면 재생이 종료됩니다.')
                         : (isYoutubeRepeatEnabled
                             ? '🎵 반복 재생 중입니다. 정차하면 일시정지되고, 곡이 끝나면 반복됩니다.'
                             : '🎵 주행 중 음원을 재생 중입니다. 곡이 끝나면 링크와 플레이어가 자동으로 정리됩니다.');
@@ -2091,6 +2153,7 @@
             }
 
             savedYoutubeVideoId = videoId;
+            showYoutubePlayer();
             savedYoutubeTitle = '노래 제목을 불러오는 중...';
             savedYoutubeChannel = '';
             ytOpenOriginal.href = `https://www.youtube.com/watch?v=${videoId}`;
@@ -2197,7 +2260,12 @@
             const currentIndex = list.tracks.findIndex(track => String(track.id) === String(playlistPlayback.currentTrackId));
             const nextIndex = currentIndex >= 0 ? currentIndex + 1 : Math.max(0, playlistPlayback.currentIndex);
             if (nextIndex >= list.tracks.length) {
-                finishPlaylistPlayback();
+                if (isYoutubeRepeatEnabled && list.tracks.length > 0) {
+                    // 플레이리스트 반복이 켜져 있으면 마지막 곡 다음에 첫 곡부터 다시 시작합니다.
+                    playPlaylistTrackAt(0);
+                } else {
+                    finishPlaylistPlayback();
+                }
                 return;
             }
             playPlaylistTrackAt(nextIndex);
@@ -2287,7 +2355,11 @@
             if (savedYoutubeVideoId) {
                 const initialUrl = `https://www.youtube.com/watch?v=${savedYoutubeVideoId}`;
                 youtubeUrlInput.value = initialUrl;
+                ytOpenOriginal.href = initialUrl;
+                showYoutubePlayer();
                 fetchYoutubeMetadata(savedYoutubeVideoId, initialUrl);
+            } else {
+                hideYoutubePlayer();
             }
             syncSettingsInputs();
             renderPlaylistManager();
