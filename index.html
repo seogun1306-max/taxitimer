@@ -1770,6 +1770,7 @@
 
                 noiseNode = audioCtx.createBufferSource();
                 noiseNode.buffer = noiseBuffer;
+                // 생성된 백색소음 버퍼를 끝없이 반복해 끊김 없이 재생합니다.
                 noiseNode.loop = true;
 
                 const filter = audioCtx.createBiquadFilter();
@@ -1784,8 +1785,19 @@
                 filter.connect(gainNode);
                 gainNode.connect(audioCtx.destination);
 
-                noiseNode.start();
+                const activeNoiseNode = noiseNode;
                 isNoisePlaying = true;
+
+                // 혹시 브라우저나 오디오 장치가 소스를 종료해도 재생 상태라면 즉시 새 버퍼로 이어 재생합니다.
+                // 사용자가 직접 끄거나 타이머가 정지한 경우에는 isNoisePlaying이 false이므로 재시작하지 않습니다.
+                activeNoiseNode.onended = () => {
+                    if (isNoisePlaying && isRunning && noiseNode === activeNoiseNode) {
+                        noiseNode = null;
+                        startWhiteNoise();
+                    }
+                };
+
+                noiseNode.start();
 
                 noiseStatusText.textContent = '재생 중 🎵';
                 noiseStatusText.className = 'text-xs font-bold text-taxi-400';
