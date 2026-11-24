@@ -1309,9 +1309,11 @@
                 channel: result.channel
             });
             savePlaylistsToStorage();
+            // 등록이 완료되면 입력한 제목과 검색 결과 목록을 함께 비웁니다.
             playlistTrackUrl.value = '';
+            currentPlaylistSearchResults = [];
+            playlistSearchResults.innerHTML = '';
             renderPlaylistManager();
-            renderPlaylistSearchResults(currentPlaylistSearchResults);
         }
 
         playlistTrackForm.addEventListener('submit', async (e) => {
@@ -1361,6 +1363,7 @@
                     savePlaylistsToStorage();
                     renderPlaylistManager();
                     playlistTrackUrl.value = '';
+                    currentPlaylistSearchResults = [];
                     playlistSearchResults.innerHTML = '';
                 } else {
                     const results = await searchYoutubeByTitle(query);
@@ -2968,8 +2971,16 @@
         // version: 버전, title: 업데이트 제목, changes: 변경 사항 배열
         // -----------------------------------------------------------------
         const PATCH_NOTES_STORAGE_KEY = 'taxi_timer_patch_notes_hidden_date_v1';
-        const CURRENT_APP_VERSION = 'v2.0.2';
+        const CURRENT_APP_VERSION = 'v2.0.3';
         const PATCH_NOTES = [
+            {
+                version: 'v2.0.3',
+                title: '플레이리스트 검색 결과 자동 정리',
+                changes: [
+                    '음원을 플레이리스트에 등록하면 검색창의 제목뿐 아니라 검색 결과 목록도 함께 사라집니다.',
+                    '유튜브 링크를 직접 등록한 경우에도 이전 검색 결과를 비워 중복 등록을 방지합니다.'
+                ]
+            },
             {
                 version: 'v2.0.2',
                 title: '모바일 포커스 이탈 시 자동 정차',
