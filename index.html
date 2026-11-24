@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>택시 타이머 ⏱️</title>
+    <title>🚖택시타이머🚕</title>
     <!-- Tailwind CSS 불러오기 -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Google Fonts: Noto Sans KR & JetBrains Mono (숫자 표시용) -->
@@ -149,9 +149,127 @@
             .nav-pill-btn:hover { transform: none; }
             button { -webkit-tap-highlight-color: transparent; }
         }
+    
+
+        /* 앱 시작 로딩 화면 */
+        #app-loading-screen {
+            position: fixed;
+            inset: 0;
+            z-index: 10000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+            background: #090d16;
+            opacity: 1;
+            visibility: visible;
+            transition: opacity 0.45s ease, visibility 0.45s ease;
+        }
+        #app-loading-screen.is-hidden {
+            opacity: 0;
+            visibility: hidden;
+            pointer-events: none;
+        }
+        .app-loading-content {
+            width: min(100%, 360px);
+            text-align: center;
+        }
+        .app-loading-title {
+            margin: 0 0 12px;
+            color: #fff;
+            font-size: clamp(25px, 7vw, 34px);
+            font-weight: 900;
+            letter-spacing: -0.06em;
+            text-shadow: 0 0 24px rgba(249, 115, 22, 0.18);
+        }
+        .app-loading-subtitle {
+            margin: 0 0 24px;
+            color: #94a3b8;
+            font-size: 13px;
+        }
+        .app-loading-track {
+            width: 100%;
+            height: 12px;
+            overflow: hidden;
+            border: 1px solid rgba(148, 163, 184, 0.18);
+            border-radius: 9999px;
+            background: #1e293b;
+            box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.35);
+        }
+        .app-loading-fill {
+            width: 0;
+            height: 100%;
+            border-radius: 9999px;
+            background: linear-gradient(90deg, #ea580c, #fb923c);
+            box-shadow: 0 0 14px rgba(249, 115, 22, 0.45);
+            animation: taxi-app-loading 1.75s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+        }
+        @keyframes taxi-app-loading {
+            0% { width: 0; }
+            62% { width: 72%; }
+            100% { width: 100%; }
+        }
+
+        /* 버전별 패치노트 */
+        #patch-notes-modal {
+            z-index: 9990;
+        }
+        #patch-notes-list {
+            overscroll-behavior: contain;
+            scrollbar-width: thin;
+            scrollbar-color: #475569 #0f172a;
+        }
+        .patch-note-version {
+            border: 1px solid rgba(148, 163, 184, 0.14);
+            background: rgba(15, 23, 42, 0.72);
+            border-radius: 14px;
+            padding: 13px 14px;
+        }
+        .patch-note-version + .patch-note-version {
+            margin-top: 10px;
+        }
+        @media (prefers-reduced-motion: reduce) {
+            .app-loading-fill { animation-duration: 0.5s; }
+            #app-loading-screen { transition-duration: 0.1s; }
+        }
+
     </style>
 </head>
 <body class="bg-navy-950 text-slate-100 font-sans min-h-screen flex flex-col justify-between selection:bg-taxi-500 selection:text-white">
+
+    <!-- 앱 시작 로딩 화면 -->
+    <div id="app-loading-screen" role="status" aria-live="polite" aria-label="택시타이머 로딩 중">
+        <div class="app-loading-content">
+            <h1 class="app-loading-title">🚖택시타이머🚕</h1>
+            <p class="app-loading-subtitle">잠시만 기다려 주세요</p>
+            <div class="app-loading-track" aria-label="로딩 진행 중">
+                <div class="app-loading-fill"></div>
+            </div>
+            <p class="mt-4 text-[11px] text-slate-500 font-mono">v2.0.0</p>
+        </div>
+    </div>
+
+    <!-- 업데이트 패치노트: 오늘 하루 표시 안 하기를 선택하면 오늘은 다시 표시하지 않습니다. -->
+    <div id="patch-notes-modal" class="fixed inset-0 hidden items-center justify-center bg-black/75 backdrop-blur-sm p-4" role="dialog" aria-modal="true" aria-labelledby="patch-notes-title">
+        <div class="w-full max-w-lg max-h-[88vh] flex flex-col overflow-hidden rounded-2xl border border-slate-700 bg-navy-900 shadow-2xl">
+            <div class="flex items-start justify-between gap-3 border-b border-slate-800 px-5 py-4">
+                <div>
+                    <p class="text-xs font-bold tracking-widest text-taxi-400">UPDATE HISTORY</p>
+                    <h2 id="patch-notes-title" class="mt-1 text-xl font-black text-white">🚕 택시타이머 패치노트</h2>
+                    <p class="mt-1 text-xs text-slate-400">새로운 기능과 지금까지의 업데이트 내역</p>
+                </div>
+                <span id="patch-notes-current-version" class="shrink-0 rounded-lg border border-taxi-500/30 bg-taxi-500/10 px-2.5 py-1 text-xs font-bold text-taxi-400">v2.0.0</span>
+            </div>
+            <div id="patch-notes-list" class="min-h-0 flex-1 overflow-y-auto px-5 py-4">
+                <!-- PATCH_NOTES 배열을 JavaScript가 버전별로 표시합니다. -->
+            </div>
+            <div class="grid grid-cols-1 gap-2 border-t border-slate-800 bg-navy-950/70 p-4 sm:grid-cols-2">
+                <button id="btn-patch-notes-confirm" type="button" class="order-1 rounded-xl bg-taxi-500 px-4 py-3 text-sm font-bold text-white transition-colors hover:bg-taxi-600">확인</button>
+                <button id="btn-patch-notes-hide-today" type="button" class="order-2 rounded-xl border border-slate-700 bg-slate-800 px-4 py-3 text-sm font-bold text-slate-200 transition-colors hover:bg-slate-700">오늘 하루 표시 안하기</button>
+            </div>
+        </div>
+    </div>
+
 
     <!-- 상단 고정 헤더 & 미니 타이머 바 -->
     <header class="sticky top-0 z-50 bg-navy-900/95 backdrop-blur-md border-b border-slate-800 shadow-lg">
@@ -2795,6 +2913,206 @@
             updateYoutubeControlsState();
             updateYoutubeMetaCard();
             applyYoutubeVolume();
+        });
+
+        // -----------------------------------------------------------------
+        // 패치노트 관리
+        // 새 업데이트가 생기면 PATCH_NOTES 배열 맨 위에 새 버전을 추가하세요.
+        // version: 버전, title: 업데이트 제목, changes: 변경 사항 배열
+        // -----------------------------------------------------------------
+        const PATCH_NOTES_STORAGE_KEY = 'taxi_timer_patch_notes_hidden_date_v1';
+        const CURRENT_APP_VERSION = 'v2.0.0';
+        const PATCH_NOTES = [
+            {
+                version: 'v2.0.0',
+                title: '시작 화면 및 패치노트 추가',
+                changes: [
+                    '앱을 켜면 🚖택시타이머🚕 로딩 화면과 둥근 끝의 진행 바가 표시됩니다.',
+                    '로딩이 끝나면 버전별 패치노트가 열립니다.',
+                    '확인 버튼과 오늘 하루 표시 안하기 버튼을 추가했습니다.',
+                    '오늘 하루 표시 안하기를 누르면 오늘 날짜가 지나기 전까지 패치노트를 다시 표시하지 않습니다.'
+                ]
+            },
+            {
+                version: 'v1.8.0',
+                title: '백색소음 반복 및 음원 종료 처리',
+                changes: [
+                    '백색소음이 끝나면 바로 다시 재생되도록 반복 동작을 보강했습니다.',
+                    '반복 재생을 켜지 않은 음원이 끝나면 링크와 유튜브 화면을 정리하도록 개선했습니다.'
+                ]
+            },
+            {
+                version: 'v1.7.0',
+                title: '쉬는시간 음악 지원',
+                changes: [
+                    '자동 쉬는시간에도 현재 노래가 계속 재생되도록 변경했습니다.',
+                    '쉬는시간 중에도 노래 검색과 음원 선택을 할 수 있도록 개선했습니다.'
+                ]
+            },
+            {
+                version: 'v1.6.0',
+                title: '노래 제목 검색',
+                changes: [
+                    '유튜브 링크 대신 노래 제목이나 가수 이름으로 검색할 수 있도록 확장했습니다.',
+                    '기본화면과 플레이리스트에서 검색 결과를 선택해 음원을 재생·등록할 수 있습니다.',
+                    '노래를 선택하면 검색 입력창을 비우고 재생 정보에는 선택한 제목을 표시합니다.',
+                    '검색 서버 응답 형식과 연결 실패 시 대체 검색 경로 처리를 보강했습니다.',
+                    '타이머 작동 중과 자동 쉬는시간에 검색할 수 있도록 검색 가능 상태를 조정했습니다.'
+                ]
+            },
+            {
+                version: 'v1.5.0',
+                title: '모바일 화면 및 화면 꺼짐 개선',
+                changes: [
+                    '모바일에서 공부 항목 추가 버튼이 화면 밖으로 밀리지 않도록 입력창과 버튼 배치를 조정했습니다.',
+                    '지원되는 모바일 브라우저에서 타이머 작동 중 화면 꺼짐을 줄이도록 화면 깨우기 기능을 추가했습니다.',
+                    '유튜브 화면의 크기와 미리보기 영역 표시를 다듬었습니다.'
+                ]
+            },
+            {
+                version: 'v1.4.0',
+                title: '플레이리스트 순차 및 반복 재생',
+                changes: [
+                    '플레이리스트 재생을 누르면 등록된 순서대로 노래가 이어서 재생됩니다.',
+                    '한 곡이 끝나면 다음 곡으로 자동 이동하고 마지막 곡에서 재생을 마칩니다.',
+                    '플레이리스트 반복을 켜면 마지막 곡 다음에 첫 곡으로 돌아갑니다.',
+                    '재생 중지와 이어 재생 기능을 추가했습니다.'
+                ]
+            },
+            {
+                version: 'v1.3.0',
+                title: '플레이리스트 관리',
+                changes: [
+                    '설정 화면에서 플레이리스트를 만들고 삭제할 수 있도록 추가했습니다.',
+                    '음원 링크로 등록하면 영상 제목이 목록에 표시되도록 개선했습니다.',
+                    '등록한 음원을 선택해 재생하고 목록을 관리할 수 있도록 구성했습니다.'
+                ]
+            },
+            {
+                version: 'v1.2.0',
+                title: '음원 재생 제어 및 화면 개선',
+                changes: [
+                    '음원 반복 재생 버튼을 추가했습니다.',
+                    '노래가 끝났을 때 링크와 재생 화면을 정리하는 동작을 보강했습니다.',
+                    '유튜브 미리보기 화면을 키우고 불필요한 안내 문구를 제거했습니다.'
+                ]
+            },
+            {
+                version: 'v1.1.0',
+                title: '집중 사운드 및 기본 UI 개선',
+                changes: [
+                    '백색소음의 켜기·끄기와 볼륨 조절을 사용할 수 있습니다.',
+                    '모바일 화면에서 타이머, 음원 입력창, 설정 UI를 사용하기 편하도록 조정했습니다.'
+                ]
+            },
+            {
+                version: 'v1.0.0',
+                title: '택시타이머 최초 구성',
+                changes: [
+                    '공부 목적지를 추가하고 선택하는 기능을 구성했습니다.',
+                    '탑승, 정차, 출발, 지불, 초기화 타이머 기능을 구성했습니다.',
+                    '30초마다 가상 집중 요금이 쌓이는 미터기를 추가했습니다.',
+                    '집중 주기와 쉬는시간 설정, 집중 기록 및 완료한 목적지 기록을 추가했습니다.',
+                    '유튜브 링크 음원 재생과 미리보기, 백색소음 기능을 포함했습니다.'
+                ]
+            }
+        ];
+
+        function getLocalDateStamp() {
+            const now = new Date();
+            const year = now.getFullYear();
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            const day = String(now.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        }
+
+        function renderPatchNotes() {
+            const list = document.getElementById('patch-notes-list');
+            const versionLabel = document.getElementById('patch-notes-current-version');
+            if (!list) return;
+            list.replaceChildren();
+            if (versionLabel) versionLabel.textContent = CURRENT_APP_VERSION;
+
+            PATCH_NOTES.forEach((note) => {
+                const article = document.createElement('article');
+                article.className = 'patch-note-version';
+
+                const heading = document.createElement('div');
+                heading.className = 'mb-2 flex flex-wrap items-center gap-2';
+
+                const version = document.createElement('span');
+                version.className = 'rounded-md bg-taxi-500/15 px-2 py-1 text-xs font-extrabold text-taxi-400';
+                version.textContent = note.version;
+
+                const title = document.createElement('h3');
+                title.className = 'text-sm font-bold text-white';
+                title.textContent = note.title;
+                heading.append(version, title);
+                article.append(heading);
+
+                const changes = document.createElement('ul');
+                changes.className = 'space-y-1.5 pl-1';
+                note.changes.forEach((change) => {
+                    const item = document.createElement('li');
+                    item.className = 'flex gap-2 text-xs leading-relaxed text-slate-300';
+                    const bullet = document.createElement('span');
+                    bullet.className = 'shrink-0 text-taxi-400';
+                    bullet.textContent = '•';
+                    const text = document.createElement('span');
+                    text.textContent = change;
+                    item.append(bullet, text);
+                    changes.append(item);
+                });
+                article.append(changes);
+                list.append(article);
+            });
+        }
+
+        function closePatchNotes() {
+            const modal = document.getElementById('patch-notes-modal');
+            if (!modal) return;
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        }
+
+        function openPatchNotes() {
+            const modal = document.getElementById('patch-notes-modal');
+            if (!modal) return;
+            renderPatchNotes();
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+
+        const patchNotesConfirmButton = document.getElementById('btn-patch-notes-confirm');
+        const patchNotesHideTodayButton = document.getElementById('btn-patch-notes-hide-today');
+        if (patchNotesConfirmButton) {
+            patchNotesConfirmButton.addEventListener('click', closePatchNotes);
+        }
+        if (patchNotesHideTodayButton) {
+            patchNotesHideTodayButton.addEventListener('click', () => {
+                try {
+                    localStorage.setItem(PATCH_NOTES_STORAGE_KEY, getLocalDateStamp());
+                } catch (error) {
+                    console.warn('오늘 하루 패치노트 숨김 설정을 저장하지 못했습니다.', error);
+                }
+                closePatchNotes();
+            });
+        }
+
+        // 앱 초기화가 끝난 뒤 로딩 화면을 닫고, 오늘 숨김 설정이 없으면 패치노트를 엽니다.
+        window.addEventListener('DOMContentLoaded', () => {
+            const loadingScreen = document.getElementById('app-loading-screen');
+            window.setTimeout(() => {
+                if (loadingScreen) loadingScreen.classList.add('is-hidden');
+
+                let hiddenToday = false;
+                try {
+                    hiddenToday = localStorage.getItem(PATCH_NOTES_STORAGE_KEY) === getLocalDateStamp();
+                } catch (error) {
+                    hiddenToday = false;
+                }
+                if (!hiddenToday) openPatchNotes();
+            }, 1800);
         });
     </script>
 </body>
