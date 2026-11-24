@@ -245,7 +245,7 @@
             <div class="app-loading-track" aria-label="로딩 진행 중">
                 <div class="app-loading-fill"></div>
             </div>
-            <p class="mt-4 text-[11px] text-slate-500 font-mono">v2.0.0</p>
+            <p class="mt-4 text-[11px] text-slate-500 font-mono">v2.0.1</p>
         </div>
     </div>
 
@@ -258,7 +258,7 @@
                     <h2 id="patch-notes-title" class="mt-1 text-xl font-black text-white">🚕 택시타이머 패치노트</h2>
                     <p class="mt-1 text-xs text-slate-400">새로운 기능과 지금까지의 업데이트 내역</p>
                 </div>
-                <span id="patch-notes-current-version" class="shrink-0 rounded-lg border border-taxi-500/30 bg-taxi-500/10 px-2.5 py-1 text-xs font-bold text-taxi-400">v2.0.0</span>
+                <span id="patch-notes-current-version" class="shrink-0 rounded-lg border border-taxi-500/30 bg-taxi-500/10 px-2.5 py-1 text-xs font-bold text-taxi-400">v2.0.1</span>
             </div>
             <div id="patch-notes-list" class="min-h-0 flex-1 overflow-y-auto px-5 py-4">
                 <!-- PATCH_NOTES 배열을 JavaScript가 버전별로 표시합니다. -->
@@ -843,14 +843,7 @@
                         BREAK_DURATION_SECONDS = breakDurationMinutes * 60;
                     }
                 }
-
-                const savedYtUrl = localStorage.getItem(STORAGE_KEYS.YOUTUBE_URL);
-                if (savedYtUrl) {
-                    const extractedId = extractYoutubeVideoId(savedYtUrl);
-                    if (extractedId) {
-                        savedYoutubeVideoId = extractedId;
-                    }
-                }
+                // 마지막으로 선택한 음원은 앱을 다시 열 때 자동 복원하지 않습니다.
 
                 const savedRepeat = localStorage.getItem(STORAGE_KEYS.YOUTUBE_REPEAT);
                 isYoutubeRepeatEnabled = savedRepeat === 'true';
@@ -2360,11 +2353,8 @@
                 enablejsapi: '1',
                 origin: window.location.origin
             });
-            // YouTube 단일 영상 반복 재생은 loop=1과 playlist=영상 ID를 함께 지정해야 합니다.
-            if (isYoutubeRepeatEnabled && !playlistPlayback.active) {
-                params.set('loop', '1');
-                params.set('playlist', savedYoutubeVideoId);
-            }
+            // 반복은 iframe URL을 다시 로드하지 않고 ENDED 상태 이벤트에서 처리합니다.
+            // 따라서 재생 중 반복 설정을 바꿔도 현재 재생 위치가 초기화되지 않습니다.
             return `https://www.youtube.com/embed/${savedYoutubeVideoId}?${params.toString()}`;
         }
 
@@ -2565,10 +2555,8 @@
             } catch (err) {}
             updateYoutubeRepeatButton();
 
-            // 플레이리스트 재생 중에는 다음 곡 자동 이동이 우선이므로 단일 곡 반복을 적용하지 않습니다.
-            if (!playlistPlayback.active && savedYoutubeVideoId && ytPlayerFrame.getAttribute('src')) {
-                loadYoutubePlayer(isYoutubePlaying);
-            }
+            // 현재 iframe은 그대로 둡니다. 다음 ENDED 이벤트부터 새 반복 설정을 적용하므로
+            // 재생 중 반복 켜기/끄기를 눌러도 곡이 처음부터 다시 시작하지 않습니다.
         });
 
         function renderYoutubeTitleSearchResults(results) {
@@ -2634,9 +2622,7 @@
             youtubeSearchResults.innerHTML = '';
             currentYoutubeSearchResults = [];
             ytOpenOriginal.href = watchUrl;
-            try {
-                localStorage.setItem(STORAGE_KEYS.YOUTUBE_URL, watchUrl);
-            } catch (err) {}
+            // 현재 선택한 음원은 세션 안에서만 유지합니다.
 
             showYoutubePlayer();
             updateYoutubeControlsState();
@@ -2778,9 +2764,7 @@
             youtubeUrlInput.value = ''; // 재생할 곡은 아래 재생 정보 카드에 표시하고 검색창은 비워둡니다.
             ytOpenOriginal.href = `https://www.youtube.com/watch?v=${track.videoId}`;
             isYoutubePlaying = true;
-            try {
-                localStorage.setItem(STORAGE_KEYS.YOUTUBE_URL, youtubeUrlInput.value);
-            } catch (err) {}
+            // 현재 선택한 음원은 세션 안에서만 유지합니다.
 
             showYoutubePlayer();
             loadYoutubePlayer(true);
@@ -2879,9 +2863,7 @@
             savedYoutubeChannel = track.channel || '';
             youtubeUrlInput.value = ''; // 재생할 곡은 아래 재생 정보 카드에 표시하고 검색창은 비워둡니다.
             ytOpenOriginal.href = `https://www.youtube.com/watch?v=${track.videoId}`;
-            try {
-                localStorage.setItem(STORAGE_KEYS.YOUTUBE_URL, youtubeUrlInput.value);
-            } catch (err) {}
+            // 현재 선택한 음원은 세션 안에서만 유지합니다.
             updateYoutubeControlsState();
             updateYoutubeMetaCard();
             switchTab('home');
@@ -2893,17 +2875,40 @@
         }
 
         // --- 초기 실행 (저장된 상태 불러오기) ---
+        // 앱을 닫거나 페이지를 벗어날 때 유튜브 프레임을 비워 백그라운드 재생을 방지합니다.
+        window.addEventListener('pagehide', () => {
+            try {
+                ytPlayerFrame.src = 'about:blank';
+                localStorage.removeItem(STORAGE_KEYS.YOUTUBE_URL);
+            } catch (err) {}
+            isYoutubePlaying = false;
+            youtubeHasStarted = false;
+        });
+
         window.addEventListener('DOMContentLoaded', () => {
             loadFromStorage();
-            if (savedYoutubeVideoId) {
-                const initialUrl = `https://www.youtube.com/watch?v=${savedYoutubeVideoId}`;
-                youtubeUrlInput.value = ''; // 저장된 음원은 유지하되 제목 검색창은 비워둡니다.
-                ytOpenOriginal.href = initialUrl;
-                showYoutubePlayer();
-                fetchYoutubeMetadata(savedYoutubeVideoId, initialUrl);
-            } else {
-                hideYoutubePlayer();
-            }
+
+            // 앱을 다시 열었을 때는 이전 음원을 불러오거나 자동 재생하지 않습니다.
+            // 과거 버전에서 저장된 YOUTUBE_URL도 제거해 오래된 음원이 나타나지 않게 합니다.
+            savedYoutubeVideoId = '';
+            savedYoutubeTitle = '';
+            savedYoutubeChannel = '';
+            isYoutubePlaying = false;
+            youtubeHasStarted = false;
+            playlistPlayback.active = false;
+            playlistPlayback.playlistId = null;
+            playlistPlayback.currentIndex = -1;
+            playlistPlayback.currentTrackId = null;
+            playlistPlayback.advancing = false;
+            playlistPlayback.hasStarted = false;
+            youtubeUrlInput.value = '';
+            ytPlayerFrame.src = 'about:blank';
+            ytOpenOriginal.href = 'https://www.youtube.com/';
+            try {
+                localStorage.removeItem(STORAGE_KEYS.YOUTUBE_URL);
+            } catch (err) {}
+            hideYoutubePlayer();
+
             syncSettingsInputs();
             renderPlaylistManager();
             updateYoutubeRepeatButton();
@@ -2921,8 +2926,18 @@
         // version: 버전, title: 업데이트 제목, changes: 변경 사항 배열
         // -----------------------------------------------------------------
         const PATCH_NOTES_STORAGE_KEY = 'taxi_timer_patch_notes_hidden_date_v1';
-        const CURRENT_APP_VERSION = 'v2.0.0';
+        const CURRENT_APP_VERSION = 'v2.0.1';
         const PATCH_NOTES = [
+            {
+                version: 'v2.0.1',
+                title: '유튜브 시작 상태 및 반복 버튼 수정',
+                changes: [
+                    '앱을 다시 열면 이전에 선택한 유튜브 음원을 자동으로 불러오거나 재생하지 않습니다.',
+                    '앱 종료 또는 페이지 이동 시 유튜브 플레이어 프레임을 비워 백그라운드 재생을 방지합니다.',
+                    '노래 재생 중 반복 켜기/끄기를 눌러도 플레이어를 다시 로드하지 않아 현재 재생 위치가 유지됩니다.',
+                    '단일 음원 반복은 곡 종료 이벤트에서 현재 곡을 처음부터 다시 재생하도록 처리합니다.'
+                ]
+            },
             {
                 version: 'v2.0.0',
                 title: '시작 화면 및 패치노트 추가',
