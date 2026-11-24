@@ -245,7 +245,7 @@
             <div class="app-loading-track" aria-label="로딩 진행 중">
                 <div class="app-loading-fill"></div>
             </div>
-            <p class="mt-4 text-[11px] text-slate-500 font-mono">v2.0.1</p>
+            <p class="mt-4 text-[11px] text-slate-500 font-mono">v2.0.2</p>
         </div>
     </div>
 
@@ -258,7 +258,7 @@
                     <h2 id="patch-notes-title" class="mt-1 text-xl font-black text-white">🚕 택시타이머 패치노트</h2>
                     <p class="mt-1 text-xs text-slate-400">새로운 기능과 지금까지의 업데이트 내역</p>
                 </div>
-                <span id="patch-notes-current-version" class="shrink-0 rounded-lg border border-taxi-500/30 bg-taxi-500/10 px-2.5 py-1 text-xs font-bold text-taxi-400">v2.0.1</span>
+                <span id="patch-notes-current-version" class="shrink-0 rounded-lg border border-taxi-500/30 bg-taxi-500/10 px-2.5 py-1 text-xs font-bold text-taxi-400">v2.0.2</span>
             </div>
             <div id="patch-notes-list" class="min-h-0 flex-1 overflow-y-auto px-5 py-4">
                 <!-- PATCH_NOTES 배열을 JavaScript가 버전별로 표시합니다. -->
@@ -727,6 +727,7 @@
         let savedYoutubeVideoId = ''; // 저장된 유튜브 영상 ID
         let screenWakeLockSentinel = null; // 모바일 화면 꺼짐 방지용 Wake Lock
         let screenWakeLockRequest = null;
+        let isMobileFocusPaused = false; // 모바일에서 포커스를 잃어 자동 정차한 상태
 
         // 실제 시계(Date.now) 기반 정밀 시간 측정을 위한 기준점 변수
         let runStartTimestamp = 0;
@@ -1565,23 +1566,63 @@
         }
 
         function syncScreenWakeLock() {
-            if (isRunning || isBreakTime) requestScreenWakeLock();
+            if (isRunning || (isBreakTime && !isMobileFocusPaused)) requestScreenWakeLock();
             else releaseScreenWakeLock();
         }
 
-        // 다른 앱으로 이동했다가 돌아오면 브라우저가 해제한 Wake Lock을 다시 요청합니다.
+        // 휴대전화·태블릿에서 앱이 백그라운드로 가거나 포커스를 잃으면 자동 정차합니다.
+        function isMobileFocusEnvironment() {
+            const userAgent = navigator.userAgent || '';
+            const mobileUserAgent = /Android|iPhone|iPad|iPod|Mobile/i.test(userAgent);
+            const coarsePointer = typeof window.matchMedia === 'function' && window.matchMedia('(pointer: coarse)').matches;
+            return mobileUserAgent || coarsePointer;
+        }
+
+        function pauseForMobileFocusLoss() {
+            if (!isMobileFocusEnvironment()) return;
+            // blur는 키보드나 브라우저 UI 때문에 발생할 수도 있으므로 실제 문서 포커스 상실만 처리합니다.
+            if (document.visibilityState !== 'hidden' && document.hasFocus()) return;
+
+            if (isRunning) {
+                isMobileFocusPaused = true;
+                pauseTimer(); // 경과 시간을 저장하고 일반 정차 상태로 전환합니다.
+                return;
+            }
+
+            // 쉬는시간 카운트다운도 백그라운드에서 끝나 자동 출발하지 않도록 남은 시간을 보존합니다.
+            if (isBreakTime && breakInterval) {
+                isMobileFocusPaused = true;
+                breakRemainingSeconds = Math.max(0, Math.ceil((breakEndTimestamp - Date.now()) / 1000));
+                clearInterval(breakInterval);
+                breakInterval = null;
+                breakEndTimestamp = 0;
+                updateBreakUI();
+                syncScreenWakeLock();
+            }
+        }
+
+        // 다른 앱으로 이동하거나 화면을 전환하면 정차합니다. 돌아와도 자동 출발하지 않습니다.
         document.addEventListener('visibilitychange', () => {
-            if (document.visibilityState === 'visible' && (isRunning || isBreakTime)) {
+            if (document.visibilityState === 'hidden') {
+                pauseForMobileFocusLoss();
+                return;
+            }
+            if (document.visibilityState === 'visible' && !isMobileFocusPaused && (isRunning || isBreakTime)) {
                 requestScreenWakeLock();
             }
         });
-        window.addEventListener('pagehide', releaseScreenWakeLock);
+        window.addEventListener('blur', pauseForMobileFocusLoss);
+        window.addEventListener('pagehide', () => {
+            pauseForMobileFocusLoss();
+            releaseScreenWakeLock();
+        });
 
         function stopBreakTimer() {
             if (breakInterval) {
                 clearInterval(breakInterval);
                 breakInterval = null;
             }
+            isMobileFocusPaused = false;
             isBreakTime = false;
             breakRemainingSeconds = 0;
             updateBreakUI();
@@ -1685,6 +1726,7 @@
                 return;
             }
 
+            isMobileFocusPaused = false; // 사용자가 직접 출발을 눌렀을 때만 자동 정차 상태를 해제합니다.
             isRunning = true;
             syncScreenWakeLock();
             btnStart.disabled = true;
@@ -2926,8 +2968,17 @@
         // version: 버전, title: 업데이트 제목, changes: 변경 사항 배열
         // -----------------------------------------------------------------
         const PATCH_NOTES_STORAGE_KEY = 'taxi_timer_patch_notes_hidden_date_v1';
-        const CURRENT_APP_VERSION = 'v2.0.1';
+        const CURRENT_APP_VERSION = 'v2.0.2';
         const PATCH_NOTES = [
+            {
+                version: 'v2.0.2',
+                title: '모바일 포커스 이탈 시 자동 정차',
+                changes: [
+                    '휴대전화나 태블릿에서 앱이 백그라운드로 가거나 포커스를 잃으면 주행 타이머가 자동으로 정차합니다.',
+                    '앱으로 돌아와도 타이머가 자동 출발하지 않으며, 출발 버튼을 직접 눌러야 다시 시작합니다.',
+                    '쉬는시간 중 포커스를 잃으면 남은 쉬는시간을 보존하고 자동 출발을 막습니다.'
+                ]
+            },
             {
                 version: 'v2.0.1',
                 title: '유튜브 시작 상태 및 반복 버튼 수정',
