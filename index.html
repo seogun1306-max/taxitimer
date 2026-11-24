@@ -2,15 +2,20 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <!-- 브라우저 탭 및 홈 화면 바로가기 아이콘 -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <!-- 브라우저 탭·모바일 홈 화면 아이콘: 파일명을 버전별로 바꿔 이전 캐시를 피합니다. -->
+    <meta name="application-name" content="택시타이머">
     <meta name="theme-color" content="#0f172a">
+    <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-title" content="택시타이머">
-    <link rel="icon" type="image/png" sizes="32x32" href="./favicon-32.png">
-    <link rel="icon" type="image/png" sizes="192x192" href="./taxi-icon-192.png">
-    <link rel="apple-touch-icon" sizes="180x180" href="./taxi-apple-touch-icon.png">
-    <link rel="manifest" href="./manifest.webmanifest">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="icon" type="image/svg+xml" href="./taxi-favicon-v2.0.8.svg">
+    <link rel="icon" type="image/png" sizes="16x16" href="./taxi-favicon-16-v2.0.8.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="./taxi-favicon-32-v2.0.8.png">
+    <link rel="shortcut icon" href="./taxi-favicon-v2.0.8.ico">
+    <link rel="apple-touch-icon" sizes="180x180" href="./taxi-apple-touch-v2.0.8.png">
+    <link rel="manifest" href="./manifest-v2.0.8.webmanifest">
     <title>🚖택시타이머🚕</title>
     <!-- Tailwind CSS 불러오기 -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -45,6 +50,14 @@
         }
     </script>
     <style>
+        /* 모바일 확대/축소 제스처는 막고 일반 한 손가락 스크롤은 유지합니다. */
+        @media (pointer: coarse) {
+            html, body {
+                touch-action: pan-x pan-y;
+                -ms-touch-action: pan-x pan-y;
+                overscroll-behavior-x: none;
+            }
+        }
         /* 커스텀 애니메이션 및 스크롤바 스타일 */
         @keyframes pulse-border {
             0%, 100% { border-color: rgba(249, 115, 22, 0.4); }
@@ -253,7 +266,7 @@
             <div class="app-loading-track" aria-label="로딩 진행 중">
                 <div class="app-loading-fill"></div>
             </div>
-            <p class="mt-4 text-[11px] text-slate-500 font-mono">v2.0.7</p>
+            <p class="mt-4 text-[11px] text-slate-500 font-mono">v2.0.8</p>
         </div>
     </div>
 
@@ -266,7 +279,7 @@
                     <h2 id="patch-notes-title" class="mt-1 text-xl font-black text-white">🚕 택시타이머 패치노트</h2>
                     <p class="mt-1 text-xs text-slate-400">새로운 기능과 지금까지의 업데이트 내역</p>
                 </div>
-                <span id="patch-notes-current-version" class="shrink-0 rounded-lg border border-taxi-500/30 bg-taxi-500/10 px-2.5 py-1 text-xs font-bold text-taxi-400">v2.0.7</span>
+                <span id="patch-notes-current-version" class="shrink-0 rounded-lg border border-taxi-500/30 bg-taxi-500/10 px-2.5 py-1 text-xs font-bold text-taxi-400">v2.0.8</span>
             </div>
             <div id="patch-notes-list" class="min-h-0 flex-1 overflow-y-auto px-5 py-4">
                 <!-- PATCH_NOTES 배열을 JavaScript가 버전별로 표시합니다. -->
@@ -595,7 +608,7 @@
                     </div>
                 </div>
                 <button id="btn-open-patch-notes-settings" type="button" class="shrink-0 bg-taxi-500 hover:bg-taxi-600 active:scale-95 text-white font-bold px-4 py-3 rounded-xl text-sm transition-all">
-                    📋 패치노트 보기 · v2.0.7
+                    📋 패치노트 보기 · v2.0.8
                 </button>
             </section>
             <section class="bg-navy-900 border border-slate-800 rounded-2xl p-5 sm:p-6 shadow-lg space-y-5">
@@ -2978,8 +2991,16 @@
         // version: 버전, title: 업데이트 제목, changes: 변경 사항 배열
         // -----------------------------------------------------------------
         const PATCH_NOTES_STORAGE_KEY = 'taxi_timer_patch_notes_hidden_date_v1';
-        const CURRENT_APP_VERSION = 'v2.0.7';
+        const CURRENT_APP_VERSION = 'v2.0.8';
         const PATCH_NOTES = [
+            {
+                version: 'v2.0.8',
+                title: '웹 아이콘 갱신 및 모바일 확대 방지',
+                changes: [
+                    '브라우저 탭, Android 홈 화면, iPhone 홈 화면 아이콘 경로를 새 파일명으로 교체해 이전 아이콘 캐시가 남는 문제를 줄였습니다.',
+                    '모바일 두 손가락 확대와 더블탭 확대를 제한하면서 한 손가락 스크롤은 유지합니다.'
+                ]
+            },
             {
                 version: 'v2.0.7',
                 title: '설정에서 여는 패치노트 버튼 정리',
@@ -3208,6 +3229,23 @@
                 if (!hiddenToday) openPatchNotes(false);
             }, 1800);
         });
+    </script>
+
+    <script id="mobile-zoom-guard-v2-0-8">
+        // 모바일 브라우저별 확대 제스처 차이를 보완합니다. 일반 한 손가락 스크롤은 막지 않습니다.
+        (() => {
+            const blockMultiTouchZoom = (event) => {
+                if (event.touches && event.touches.length > 1) {
+                    event.preventDefault();
+                }
+            };
+            document.addEventListener('touchstart', blockMultiTouchZoom, { passive: false });
+            document.addEventListener('touchmove', blockMultiTouchZoom, { passive: false });
+
+            ['gesturestart', 'gesturechange', 'gestureend'].forEach((eventName) => {
+                document.addEventListener(eventName, (event) => event.preventDefault(), { passive: false });
+            });
+        })();
     </script>
 </body>
 </html>
