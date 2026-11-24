@@ -346,7 +346,7 @@
                         <span id="yt-volume-value" class="text-xs text-slate-300 tabular-nums w-9 text-right">60%</span>
                     </div>
                     <p id="yt-helper-text" class="text-[11px] text-slate-500">
-                        * 주행(공부) 중일 때만 유튜브 영상/노래를 재생할 수 있으며, 정차하거나 쉬는시간이 되면 자동으로 멈춥니다.
+                        * 노래 검색과 선택은 주행 중 또는 쉬는시간에 가능합니다. 쉬는시간에는 재생 중인 음악도 계속 이어집니다. 일반 정차 중에는 음악이 멈춥니다.
                     </p>
                     <!-- 재생 정보와 유튜브 미리보기를 하나의 카드로 통합 -->
                     <div id="yt-preview-card" class="hidden rounded-xl border border-slate-800 bg-navy-950 p-3 space-y-2">
@@ -381,6 +381,7 @@
                         </div>
                         <p class="text-[10px] leading-relaxed text-slate-500">광고 건너뛰기는 유튜브가 허용했을 때 영상 화면 안에 표시됩니다.</p>
                     </div>
+
                 </div>
             </section>
 
@@ -506,7 +507,7 @@
                     <span class="text-2xl">🎵</span>
                     <div>
                         <h2 class="font-bold text-lg text-white">유튜브 플레이리스트</h2>
-                        <p class="text-xs text-slate-400 mt-0.5">노래 제목이나 가수 이름으로 유튜브 영상을 검색해 플레이리스트에 등록할 수 있습니다.</p>
+                        <p class="text-xs text-slate-400 mt-0.5">탑승(타이머 작동) 중에 노래 제목이나 가수 이름으로 검색해 플레이리스트에 등록할 수 있습니다.</p>
                     </div>
                 </div>
 
@@ -826,6 +827,7 @@
         const playlistTrackList = document.getElementById('playlist-track-list');
         const playlistSearchResults = document.getElementById('playlist-search-results');
         let currentPlaylistSearchResults = [];
+        let isPlaylistSearching = false;
         const playlistTrackCount = document.getElementById('playlist-track-count');
         const btnPlayPlaylist = document.getElementById('btn-play-playlist');
 
@@ -1159,7 +1161,11 @@
                 const activeList = getActivePlaylist();
                 const alreadyAdded = !!(activeList && activeList.tracks.some(track => track.videoId === result.videoId));
                 addButton.textContent = alreadyAdded ? '등록됨' : '추가';
-                addButton.disabled = alreadyAdded;
+                addButton.dataset.songSearchAction = 'true';
+                addButton.dataset.alreadyAdded = String(alreadyAdded);
+                addButton.disabled = alreadyAdded || !canUseSongFeatures();
+                addButton.classList.toggle('opacity-50', addButton.disabled);
+                addButton.classList.toggle('cursor-not-allowed', addButton.disabled);
                 addButton.addEventListener('click', () => addSearchedTrackToPlaylist(result, addButton));
 
                 li.append(info, addButton);
@@ -1168,6 +1174,10 @@
         }
 
         function addSearchedTrackToPlaylist(result, button) {
+            if (!canUseSongFeatures()) {
+                showModal('주행 중 전용 기능 🎵', '검색 결과 등록은 주행 중 또는 쉬는시간에 할 수 있습니다.');
+                return;
+            }
             const activeList = getActivePlaylist();
             if (!activeList) {
                 showModal('플레이리스트 필요', '먼저 플레이리스트를 만들어주세요.');
@@ -1194,6 +1204,11 @@
 
         playlistTrackForm.addEventListener('submit', async (e) => {
             e.preventDefault();
+            if (!canUseSongFeatures()) {
+                showModal('주행 중 전용 기능 🎵', '노래 검색과 플레이리스트 등록은 주행 중 또는 쉬는시간에 할 수 있습니다.');
+                return;
+            }
+            if (isPlaylistSearching) return;
             const activeList = getActivePlaylist();
             const query = playlistTrackUrl.value.trim();
             if (!activeList) {
@@ -1202,8 +1217,10 @@
             }
             if (!query) return;
 
+            isPlaylistSearching = true;
             btnAddPlaylistTrack.disabled = true;
             btnAddPlaylistTrack.textContent = '검색 중';
+            updateSongSearchAvailability();
             playlistSearchResults.innerHTML = '<li class="text-center py-4 text-xs text-slate-400">노래를 검색하고 있습니다...</li>';
             try {
                 // 예전처럼 YouTube 링크를 붙여넣은 경우도 계속 등록할 수 있도록 유지합니다.
@@ -1216,6 +1233,10 @@
                         return;
                     }
                     const metadata = await requestYoutubeMetadata(directVideoId, query);
+                    if (!canUseSongFeatures()) {
+                        showModal('주행 중 전용 기능 🎵', '검색이 끝나기 전에 타이머가 정차되어 음원을 등록하지 않았습니다. 다시 탑승한 뒤 등록해주세요.');
+                        return;
+                    }
                     const latestList = getActivePlaylist();
                     if (!latestList) return;
                     latestList.tracks.push({
@@ -1231,7 +1252,11 @@
                     playlistSearchResults.innerHTML = '';
                 } else {
                     const results = await searchYoutubeByTitle(query);
-                    renderPlaylistSearchResults(results);
+                    if (!canUseSongFeatures()) {
+                        playlistSearchResults.innerHTML = '<li class="text-center py-4 text-xs text-amber-300">타이머가 정지되어 검색 결과를 숨겼습니다. 다시 탑승하거나 쉬는시간에 검색해주세요.</li>';
+                    } else {
+                        renderPlaylistSearchResults(results);
+                    }
                 }
             } catch (err) {
                 console.warn('노래 제목 검색 실패:', err);
@@ -1242,8 +1267,9 @@
                 playlistSearchResults.appendChild(errorItem);
                 showModal('노래 검색 실패', `${err?.message || '검색 서버에 연결할 수 없습니다.'} 잠시 후 다시 시도하거나 유튜브 링크를 직접 입력해주세요.`);
             } finally {
-                btnAddPlaylistTrack.disabled = false;
+                isPlaylistSearching = false;
                 btnAddPlaylistTrack.textContent = '검색';
+                updateSongSearchAvailability();
             }
         });
 
@@ -2094,6 +2120,43 @@
         let savedYoutubeTitle = '';
         let savedYoutubeChannel = '';
 
+        // 주행 중과 자동 쉬는시간에는 음악 재생 및 노래 검색을 허용합니다.
+        // 사용자가 직접 정차했거나 대기 중일 때는 음악을 멈추고 검색을 잠급니다.
+        function canUseSongFeatures() {
+            return isRunning || isBreakTime;
+        }
+
+        function updateSongSearchAvailability() {
+            const canSearch = canUseSongFeatures();
+            const generalSearchBusy = isYoutubeSearching;
+            const playlistSearchBusy = isPlaylistSearching;
+
+            youtubeUrlInput.disabled = !canSearch || generalSearchBusy;
+            btnYtApply.disabled = !canSearch || generalSearchBusy;
+            youtubeUrlInput.placeholder = canSearch
+                ? '노래 제목 또는 가수 이름 입력 (유튜브 링크도 가능)'
+                : (isBreakTime ? '쉬는시간에도 노래 검색 가능' : '탑승하면 노래 제목을 검색할 수 있습니다');
+            btnYtApply.classList.toggle('opacity-50', !canSearch || generalSearchBusy);
+            btnYtApply.classList.toggle('cursor-not-allowed', !canSearch || generalSearchBusy);
+            youtubeUrlInput.title = canSearch ? '노래 제목이나 가수 이름을 검색하세요.' : '주행 중 또는 쉬는시간에 노래를 검색할 수 있습니다.';
+
+            playlistTrackUrl.disabled = !canSearch || playlistSearchBusy;
+            btnAddPlaylistTrack.disabled = !canSearch || playlistSearchBusy;
+            playlistTrackUrl.placeholder = canSearch
+                ? '노래 제목 또는 가수 이름 입력'
+                : (isBreakTime ? '쉬는시간에도 플레이리스트 검색 가능' : '탑승하면 플레이리스트 음원을 검색할 수 있습니다');
+            btnAddPlaylistTrack.classList.toggle('opacity-50', !canSearch || playlistSearchBusy);
+            btnAddPlaylistTrack.classList.toggle('cursor-not-allowed', !canSearch || playlistSearchBusy);
+            playlistTrackUrl.title = canSearch ? '노래 제목이나 가수 이름을 검색하세요.' : '주행 중 또는 쉬는시간에 노래를 검색할 수 있습니다.';
+
+            // 검색 결과 버튼도 주행 또는 자동 쉬는시간이 아닐 때만 잠급니다.
+            document.querySelectorAll('[data-song-search-action]').forEach(button => {
+                button.disabled = !canSearch || button.dataset.alreadyAdded === 'true';
+                button.classList.toggle('opacity-50', button.disabled);
+                button.classList.toggle('cursor-not-allowed', button.disabled);
+            });
+        }
+
         function extractYoutubeVideoId(url) {
             if (!url) return '';
             const trimmed = url.trim();
@@ -2258,8 +2321,8 @@
         }
 
         function startYoutubePlayback() {
-            if (!isRunning) {
-                showModal('주행 중 전용 기능 🎵', '음원은 택시 주행(공부) 중에만 재생할 수 있습니다!');
+            if (!canUseSongFeatures()) {
+                showModal('주행 중 전용 기능 🎵', '음원은 주행 중 또는 쉬는시간에 재생할 수 있습니다.');
                 return;
             }
             if (!savedYoutubeVideoId) {
@@ -2274,43 +2337,52 @@
         }
 
         function updateYoutubeControlsState() {
-            if (!isRunning && isYoutubePlaying) {
+            updateSongSearchAvailability();
+            const canUseMusic = canUseSongFeatures();
+
+            // 자동 쉬는시간(isBreakTime)에는 재생을 계속합니다. 일반 정차/대기일 때만 멈춥니다.
+            if (!canUseMusic && isYoutubePlaying) {
                 stopYoutubePlayback();
                 return;
             }
 
             if (!savedYoutubeVideoId) {
                 btnYtToggle.disabled = true;
-                btnYtToggle.textContent = '링크 먼저 적용';
+                btnYtToggle.textContent = '음원 선택 필요';
                 btnYtToggle.className = 'px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm bg-slate-800 text-slate-500 border border-slate-700 transition-all opacity-50 cursor-not-allowed whitespace-nowrap';
-                ytHelperText.textContent = '* 노래 제목이나 가수를 검색한 뒤 원하는 곡을 선택하세요. 유튜브 링크를 붙여넣어도 됩니다.';
+                ytHelperText.textContent = isBreakTime
+                    ? '☕ 쉬는시간에도 노래 검색과 재생이 가능합니다. 제목을 검색해 곡을 선택하세요.'
+                    : '* 노래 제목이나 가수를 검색한 뒤 원하는 곡을 선택하세요. 유튜브 링크를 붙여넣어도 됩니다.';
                 updatePlaylistPlaybackButton();
                 return;
             }
 
-            if (isRunning) {
+            if (canUseMusic) {
                 btnYtToggle.disabled = false;
                 if (isYoutubePlaying) {
                     btnYtToggle.textContent = '음원 끄기';
                     btnYtToggle.className = 'px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm bg-rose-600 hover:bg-rose-500 text-white transition-all cursor-pointer whitespace-nowrap shadow-md shadow-rose-600/20';
-                    ytHelperText.textContent = playlistPlayback.active
+                    const breakPrefix = isBreakTime ? '☕ 쉬는시간에도 음악이 계속 재생되고 검색할 수 있습니다. ' : '';
+                    ytHelperText.textContent = breakPrefix + (playlistPlayback.active
                         ? (isYoutubeRepeatEnabled
                             ? '🔁 플레이리스트 반복 재생 중입니다. 마지막 곡이 끝나면 첫 곡부터 다시 재생합니다.'
                             : '🎶 플레이리스트를 순서대로 재생 중입니다. 마지막 곡이 끝나면 재생이 종료됩니다.')
                         : (isYoutubeRepeatEnabled
-                            ? '🎵 반복 재생 중입니다. 정차하면 일시정지되고, 곡이 끝나면 반복됩니다.'
-                            : '🎵 주행 중 음원을 재생 중입니다. 곡이 끝나면 링크와 플레이어가 자동으로 정리됩니다.');
+                            ? '🎵 반복 재생 중입니다. 일반 정차 시 멈추며 쉬는시간에는 계속 재생됩니다.'
+                            : '🎵 음원을 재생 중입니다. 일반 정차 시 멈추며 곡이 끝나면 링크와 플레이어가 자동으로 정리됩니다.'));
                 } else {
                     btnYtToggle.textContent = '음원 재생';
                     btnYtToggle.className = 'px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm bg-taxi-500 hover:bg-taxi-600 text-white transition-all cursor-pointer whitespace-nowrap shadow-md shadow-taxi-500/20';
-                    ytHelperText.textContent = '✅ 음원 준비 완료. [음원 재생]을 눌러 재생하세요.';
+                    ytHelperText.textContent = isBreakTime
+                        ? '☕ 쉬는시간에도 검색하고 음원을 재생할 수 있습니다. [음원 재생]을 눌러주세요.'
+                        : '✅ 음원 준비 완료. [음원 재생]을 눌러 재생하세요.';
                 }
             } else {
                 btnYtToggle.disabled = true;
-                btnYtToggle.textContent = '주행 중 재생';
+                btnYtToggle.textContent = '재생 대기';
                 btnYtToggle.className = 'px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm bg-slate-800 text-slate-500 border border-slate-700 transition-all opacity-50 cursor-not-allowed whitespace-nowrap';
                 ytHelperText.textContent = playlistPlayback.active
-                    ? '* 플레이리스트가 일시정지되었습니다. 탑승 후 [이어 재생]을 눌러주세요.'
+                    ? '* 플레이리스트가 일시정지되었습니다. 다시 탑승한 뒤 [이어 재생]을 눌러주세요.'
                     : '* 노래가 준비되었습니다. 탑승 버튼을 누른 뒤 음원 재생을 눌러주세요.';
             }
             updatePlaylistPlaybackButton();
@@ -2410,8 +2482,12 @@
 
                 const selectButton = document.createElement('button');
                 selectButton.type = 'button';
-                selectButton.className = 'shrink-0 px-3 py-2 rounded-lg bg-taxi-500 hover:bg-taxi-600 text-white text-xs font-bold';
-                selectButton.textContent = isRunning ? '선택·재생' : '선택';
+                selectButton.className = 'shrink-0 px-3 py-2 rounded-lg bg-taxi-500 hover:bg-taxi-600 disabled:bg-slate-800 disabled:text-slate-500 text-white text-xs font-bold';
+                selectButton.dataset.songSearchAction = 'true';
+                selectButton.textContent = '선택·재생';
+                selectButton.disabled = !canUseSongFeatures();
+                selectButton.classList.toggle('opacity-50', selectButton.disabled);
+                selectButton.classList.toggle('cursor-not-allowed', selectButton.disabled);
                 selectButton.addEventListener('click', () => selectYoutubeSearchResult(result));
 
                 li.append(info, selectButton);
@@ -2420,6 +2496,10 @@
         }
 
         function selectYoutubeSearchResult(result) {
+            if (!canUseSongFeatures()) {
+                showModal('주행 중 전용 기능 🎵', '노래 선택은 주행 중 또는 쉬는시간에 할 수 있습니다.');
+                return;
+            }
             if (!result || !result.videoId) return;
             if (playlistPlayback.active) stopPlaylistPlayback();
 
@@ -2444,14 +2524,18 @@
             updateYoutubeControlsState();
             updateYoutubeMetaCard();
 
-            if (isRunning) {
+            if (canUseSongFeatures()) {
                 startYoutubePlayback();
             } else {
-                showModal('음원 선택 완료 🎵', `"${savedYoutubeTitle}" 곡을 선택했습니다. 탑승 후 음원 재생 버튼을 눌러주세요!`);
+                showModal('음원 선택 완료 🎵', `"${savedYoutubeTitle}" 곡을 선택했습니다. 주행 중 또는 쉬는시간에 음원 재생 버튼을 눌러주세요!`);
             }
         }
 
         btnYtApply.addEventListener('click', async () => {
+            if (!canUseSongFeatures()) {
+                showModal('주행 중 전용 기능 🎵', '노래 검색은 주행 중 또는 쉬는시간에 할 수 있습니다.');
+                return;
+            }
             if (isYoutubeSearching) return;
             const query = youtubeUrlInput.value.trim();
             if (!query) {
@@ -2488,7 +2572,11 @@
             youtubeSearchResults.innerHTML = '<li class="text-center py-3 text-xs text-slate-400">노래를 검색하고 있습니다...</li>';
             try {
                 const results = await searchYoutubeByTitle(query);
-                renderYoutubeTitleSearchResults(results);
+                if (!canUseSongFeatures()) {
+                    youtubeSearchResults.innerHTML = '<li class="text-center py-3 text-xs text-amber-300">타이머가 정지되어 검색 결과를 숨겼습니다. 다시 탑승하거나 쉬는시간에 검색해주세요.</li>';
+                } else {
+                    renderYoutubeTitleSearchResults(results);
+                }
             } catch (err) {
                 console.warn('일반 음원 제목 검색 실패:', err);
                 youtubeSearchResults.innerHTML = '';
@@ -2498,8 +2586,8 @@
                 youtubeSearchResults.appendChild(errorItem);
             } finally {
                 isYoutubeSearching = false;
-                btnYtApply.disabled = false;
                 btnYtApply.textContent = '검색';
+                updateSongSearchAvailability();
             }
         });
 
@@ -2507,6 +2595,10 @@
         youtubeUrlInput.addEventListener('keydown', (event) => {
             if (event.key === 'Enter') {
                 event.preventDefault();
+                if (!canUseSongFeatures()) {
+                    showModal('주행 중 전용 기능 🎵', '노래 검색은 주행 중 또는 쉬는시간에 할 수 있습니다.');
+                    return;
+                }
                 btnYtApply.click();
             }
         });
@@ -2610,8 +2702,8 @@
                 showModal('재생할 음원이 없습니다 🎵', '플레이리스트에 음원을 먼저 등록해주세요.');
                 return;
             }
-            if (!isRunning) {
-                showModal('주행 중 전용 기능 🎵', '플레이리스트 재생은 탑승(공부 시작) 후 사용할 수 있습니다.');
+            if (!canUseSongFeatures()) {
+                showModal('주행 중 전용 기능 🎵', '플레이리스트는 주행 중 또는 쉬는시간에 재생할 수 있습니다.');
                 return;
             }
 
@@ -2631,8 +2723,8 @@
                 startPlaylistPlayback();
                 return;
             }
-            if (!isRunning) {
-                showModal('주행 중 전용 기능 🎵', '탑승(공부 시작) 후 [이어 재생]을 눌러주세요.');
+            if (!canUseSongFeatures()) {
+                showModal('주행 중 전용 기능 🎵', '주행 중 또는 쉬는시간에 [이어 재생]을 눌러주세요.');
                 return;
             }
             const list = youtubePlaylists.find(item => String(item.id) === String(playlistPlayback.playlistId));
@@ -2675,14 +2767,14 @@
             updateYoutubeControlsState();
             updateYoutubeMetaCard();
             switchTab('home');
-            if (isRunning) {
+            if (canUseSongFeatures()) {
                 startYoutubePlayback();
             } else {
-                showModal('음원 선택 완료 🎵', `"${savedYoutubeTitle}" 음원을 선택했습니다. 탑승 후 음원 재생 버튼을 눌러주세요!`);
+                showModal('음원 선택 완료 🎵', `"${savedYoutubeTitle}" 음원을 선택했습니다. 주행 중 또는 쉬는시간에 음원 재생 버튼을 눌러주세요!`);
             }
         }
 
-                // --- 초기 실행 (저장된 상태 불러오기) ---
+        // --- 초기 실행 (저장된 상태 불러오기) ---
         window.addEventListener('DOMContentLoaded', () => {
             loadFromStorage();
             if (savedYoutubeVideoId) {
