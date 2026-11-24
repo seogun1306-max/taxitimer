@@ -504,7 +504,7 @@
                     <span class="text-2xl">🎵</span>
                     <div>
                         <h2 class="font-bold text-lg text-white">유튜브 플레이리스트</h2>
-                        <p class="text-xs text-slate-400 mt-0.5">플레이리스트를 만들고 링크를 등록하면 영상 제목으로 목록에 저장됩니다.</p>
+                        <p class="text-xs text-slate-400 mt-0.5">노래 제목이나 가수 이름으로 유튜브 영상을 검색해 플레이리스트에 등록할 수 있습니다.</p>
                     </div>
                 </div>
 
@@ -974,49 +974,154 @@
             });
         });
 
-        // 제목 검색은 공개 Invidious 검색 API를 이용합니다. 응답이 없는 인스턴스는 다음 주소로 자동 전환합니다.
-        // 현재 공개 인스턴스 목록: https://docs.invidious.io/instances/
-        const YOUTUBE_SEARCH_INSTANCES = [
+        // 제목 검색은 Piped API를 우선 사용하고, 실패하면 Invidious API로 자동 전환합니다.
+        // Piped 검색 결과는 { items: [{ type: "stream", url: "/watch?v=..." }] } 형태이며,
+        // Invidious 검색 결과는 [{ type: "video", videoId: "..." }] 형태이므로 두 형식을 모두 변환합니다.
+        const PIPED_SEARCH_INSTANCES = [
+            'https://pipedapi.kavin.rocks',
+            'https://pipedapi.leptons.xyz',
+            'https://pipedapi.nosebs.ru'
+        ];
+        const INVIDIOUS_SEARCH_INSTANCES = [
             'https://inv.nadeko.net',
             'https://invidious.nerdvpn.de',
             'https://yt.chocolatemoo53.com',
             'https://invidious.tiekoetter.com'
         ];
 
-        async function searchYoutubeByTitle(query) {
-            let lastError = null;
-            for (const instance of YOUTUBE_SEARCH_INSTANCES) {
-                const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), 9000);
-                try {
-                    const params = new URLSearchParams({ q: query, type: 'video', region: 'KR' });
-                    const response = await fetch(`${instance}/api/v1/search?${params.toString()}`, {
-                        method: 'GET',
-                        mode: 'cors',
-                        credentials: 'omit',
-                        signal: controller.signal,
-                        headers: { 'Accept': 'application/json' }
-                    });
-                    if (!response.ok) throw new Error(`검색 서버 응답 오류 (${response.status})`);
-                    const data = await response.json();
-                    const results = (Array.isArray(data) ? data : [])
-                        .filter(item => item && item.type === 'video' && /^[A-Za-z0-9_-]{11}$/.test(item.videoId || ''))
-                        .slice(0, 8)
-                        .map(item => ({
-                            videoId: item.videoId,
-                            title: item.title || '제목 없는 영상',
-                            channel: item.author || 'YouTube',
-                            lengthSeconds: Number(item.lengthSeconds) || 0
-                        }));
-                    if (!results.length) throw new Error('검색 결과가 없습니다.');
-                    return results;
-                } catch (err) {
-                    lastError = err;
-                } finally {
-                    clearTimeout(timeoutId);
-                }
+        function extractSearchResultVideoId(item, baseUrl = 'https://www.youtube.com') {
+            if (!item) return '';
+            const directId = item.videoId || item.video_id || item.id;
+            if (typeof directId === 'string' && /^[A-Za-z0-9_-]{11}$/.test(directId)) {
+                return directId;
             }
-            throw lastError || new Error('YouTube 검색에 실패했습니다.');
+
+            const rawUrl = item.url || item.videoUrl || item.link || '';
+            if (typeof rawUrl !== 'string' || !rawUrl) return '';
+
+            try {
+                const parsedUrl = new URL(rawUrl, baseUrl);
+                const queryId = parsedUrl.searchParams.get('v');
+                if (queryId && /^[A-Za-z0-9_-]{11}$/.test(queryId)) return queryId;
+                const pathMatch = parsedUrl.pathname.match(/\/(?:embed|shorts|v)\/([A-Za-z0-9_-]{11})/);
+                if (pathMatch) return pathMatch[1];
+            } catch (err) {}
+
+            const fallbackMatch = rawUrl.match(/(?:youtu\.be\/|[?&]v=|\/embed\/|\/shorts\/)([A-Za-z0-9_-]{11})/);
+            return fallbackMatch ? fallbackMatch[1] : '';
+        }
+
+        function normalizePipedSearchResults(data, instance) {
+            const items = Array.isArray(data) ? data : (Array.isArray(data?.items) ? data.items : []);
+            return items
+                .filter(item => item && (item.type === 'stream' || item.type === 'video' || !item.type))
+                .map(item => {
+                    const videoId = extractSearchResultVideoId(item, instance);
+                    if (!videoId) return null;
+                    return {
+                        videoId,
+                        title: item.title || '제목 없는 영상',
+                        channel: item.uploaderName || item.uploader || item.author || 'YouTube',
+                        lengthSeconds: Number(item.duration || item.lengthSeconds) || 0
+                    };
+                })
+                .filter(Boolean)
+                .filter((item, index, all) => all.findIndex(other => other.videoId === item.videoId) === index)
+                .slice(0, 8);
+        }
+
+        function normalizeInvidiousSearchResults(data) {
+            const items = Array.isArray(data) ? data : (Array.isArray(data?.items) ? data.items : []);
+            return items
+                .filter(item => item && (item.type === 'video' || item.type === 'stream'))
+                .map(item => {
+                    const videoId = extractSearchResultVideoId(item);
+                    if (!videoId) return null;
+                    return {
+                        videoId,
+                        title: item.title || '제목 없는 영상',
+                        channel: item.author || item.authorName || item.uploader || 'YouTube',
+                        lengthSeconds: Number(item.lengthSeconds || item.duration) || 0
+                    };
+                })
+                .filter(Boolean)
+                .filter((item, index, all) => all.findIndex(other => other.videoId === item.videoId) === index)
+                .slice(0, 8);
+        }
+
+        async function requestSearchJson(url, providerName, timeoutMs = 6500) {
+            const controller = new AbortController();
+            const timeoutId = window.setTimeout(() => controller.abort(), timeoutMs);
+            try {
+                const response = await fetch(url, {
+                    method: 'GET',
+                    mode: 'cors',
+                    credentials: 'omit',
+                    cache: 'no-store',
+                    signal: controller.signal,
+                    headers: { 'Accept': 'application/json' }
+                });
+                if (!response.ok) {
+                    throw new Error(`${providerName}: HTTP ${response.status}`);
+                }
+                return await response.json();
+            } catch (err) {
+                if (err && err.name === 'AbortError') {
+                    throw new Error(`${providerName}: 응답 시간 초과`);
+                }
+                if (err instanceof TypeError) {
+                    throw new Error(`${providerName}: 브라우저 연결 또는 CORS 차단`);
+                }
+                throw err;
+            } finally {
+                window.clearTimeout(timeoutId);
+            }
+        }
+
+        async function searchProviderGroup(query, providers, makeUrl, normalize) {
+            const errors = [];
+            const attempts = providers.map(async provider => {
+                const url = makeUrl(provider, query);
+                const data = await requestSearchJson(url, new URL(provider).host);
+                const results = normalize(data, provider);
+                if (!results.length) {
+                    throw new Error(`${new URL(provider).host}: 검색 결과 없음`);
+                }
+                return results;
+            });
+
+            try {
+                // 먼저 성공한 검색 서버의 결과를 사용합니다. 나머지 요청도 개별 시간 제한 후 종료됩니다.
+                return await Promise.any(attempts);
+            } catch (aggregateError) {
+                if (aggregateError && Array.isArray(aggregateError.errors)) {
+                    aggregateError.errors.forEach(error => errors.push(error.message || String(error)));
+                } else {
+                    errors.push(aggregateError?.message || '알 수 없는 검색 오류');
+                }
+                return { error: errors };
+            }
+        }
+
+        async function searchYoutubeByTitle(query) {
+            const pipedResult = await searchProviderGroup(
+                query,
+                PIPED_SEARCH_INSTANCES,
+                (instance, q) => `${instance}/search?${new URLSearchParams({ q, filter: 'videos' }).toString()}`,
+                normalizePipedSearchResults
+            );
+            if (Array.isArray(pipedResult)) return pipedResult;
+
+            const invidiousResult = await searchProviderGroup(
+                query,
+                INVIDIOUS_SEARCH_INSTANCES,
+                (instance, q) => `${instance}/api/v1/search?${new URLSearchParams({ q, type: 'video', region: 'KR' }).toString()}`,
+                normalizeInvidiousSearchResults
+            );
+            if (Array.isArray(invidiousResult)) return invidiousResult;
+
+            const details = [...(pipedResult.error || []), ...(invidiousResult.error || [])].slice(0, 5).join(' / ');
+            throw new Error(details || '검색 서버에서 결과를 가져오지 못했습니다.');
         }
 
         function formatSearchDuration(seconds) {
@@ -1128,7 +1233,11 @@
             } catch (err) {
                 console.warn('노래 제목 검색 실패:', err);
                 playlistSearchResults.innerHTML = '';
-                showModal('노래 검색 실패', '검색 서버에 연결하지 못했거나 결과가 없습니다. 잠시 후 다시 시도해주세요.');
+                const errorItem = document.createElement('li');
+                errorItem.className = 'text-center py-4 px-3 text-xs text-rose-300 bg-rose-500/10 border border-rose-500/30 rounded-xl';
+                errorItem.textContent = `검색 실패: ${err?.message || '검색 서버에 연결할 수 없습니다.'}`;
+                playlistSearchResults.appendChild(errorItem);
+                showModal('노래 검색 실패', `${err?.message || '검색 서버에 연결할 수 없습니다.'} 잠시 후 다시 시도하거나 유튜브 링크를 직접 입력해주세요.`);
             } finally {
                 btnAddPlaylistTrack.disabled = false;
                 btnAddPlaylistTrack.textContent = '검색';
