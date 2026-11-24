@@ -320,19 +320,21 @@
                     <div class="flex flex-col sm:flex-row gap-2">
                         <input
                             id="youtube-url-input"
-                            type="url"
-                            placeholder="유튜브 링크 입력 (예: https://youtu.be/... 또는 https://www.youtube.com/watch?v=...)"
-                            class="flex-grow bg-navy-950 border border-slate-700 focus:border-taxi-500 focus:outline-none rounded-xl px-3.5 py-2.5 text-xs sm:text-sm text-white placeholder-slate-500 transition-colors"
+                            type="text"
+                            autocomplete="off"
+                            placeholder="노래 제목 또는 가수 이름 입력 (유튜브 링크도 가능)"
+                            class="flex-grow min-w-0 bg-navy-950 border border-slate-700 focus:border-taxi-500 focus:outline-none rounded-xl px-3.5 py-2.5 text-xs sm:text-sm text-white placeholder-slate-500 transition-colors"
                         >
                         <div class="flex gap-2 shrink-0">
                             <button id="btn-yt-apply" type="button" class="bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-bold px-3.5 py-2.5 rounded-xl text-xs sm:text-sm transition-colors cursor-pointer">
-                                링크 적용
+                                검색
                             </button>
                             <button id="btn-yt-toggle" type="button" disabled class="px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm bg-slate-800 text-slate-500 border border-slate-700 transition-all opacity-50 cursor-not-allowed whitespace-nowrap">
                                 주행 중 재생
                             </button>
                         </div>
                     </div>
+                    <ul id="youtube-search-results" class="space-y-2"></ul>
                     <div class="flex justify-end">
                         <button id="btn-yt-repeat" type="button" aria-pressed="false" class="px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition-colors">
                             🔁 반복 꺼짐
@@ -1185,6 +1187,7 @@
                 channel: result.channel
             });
             savePlaylistsToStorage();
+            playlistTrackUrl.value = '';
             renderPlaylistManager();
             renderPlaylistSearchResults(currentPlaylistSearchResults);
         }
@@ -2083,6 +2086,9 @@
         const ytVolumeSlider = document.getElementById('yt-volume');
         const ytVolumeValue = document.getElementById('yt-volume-value');
         const ytOpenOriginal = document.getElementById('yt-open-original');
+        const youtubeSearchResults = document.getElementById('youtube-search-results');
+        let currentYoutubeSearchResults = [];
+        let isYoutubeSearching = false;
         let isYoutubePlaying = false;
         let youtubeHasStarted = false;
         let savedYoutubeTitle = '';
@@ -2257,7 +2263,7 @@
                 return;
             }
             if (!savedYoutubeVideoId) {
-                showModal('유튜브 링크 필요 🎵', '먼저 유효한 유튜브 링크를 입력하고 [링크 적용]을 눌러주세요!');
+                showModal('음원 선택 필요 🎵', '먼저 노래 제목이나 가수 이름을 검색하고 원하는 곡을 선택해주세요.');
                 youtubeUrlInput.focus();
                 return;
             }
@@ -2277,7 +2283,7 @@
                 btnYtToggle.disabled = true;
                 btnYtToggle.textContent = '링크 먼저 적용';
                 btnYtToggle.className = 'px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm bg-slate-800 text-slate-500 border border-slate-700 transition-all opacity-50 cursor-not-allowed whitespace-nowrap';
-                ytHelperText.textContent = '* 유튜브 링크를 적용하면 제목이 표시됩니다. 주행 중 음원을 재생할 수 있습니다.';
+                ytHelperText.textContent = '* 노래 제목이나 가수를 검색한 뒤 원하는 곡을 선택하세요. 유튜브 링크를 붙여넣어도 됩니다.';
                 updatePlaylistPlaybackButton();
                 return;
             }
@@ -2375,47 +2381,129 @@
             }
         });
 
-        btnYtApply.addEventListener('click', async () => {
-            // 메인 링크를 직접 적용하면 플레이리스트 순차 재생 모드에서 벗어납니다.
+        function renderYoutubeTitleSearchResults(results) {
+            currentYoutubeSearchResults = Array.isArray(results) ? results : [];
+            youtubeSearchResults.innerHTML = '';
+
+            if (!currentYoutubeSearchResults.length) {
+                const empty = document.createElement('li');
+                empty.className = 'text-center py-3 text-xs text-slate-400';
+                empty.textContent = '검색 결과가 없습니다. 다른 제목으로 검색해주세요.';
+                youtubeSearchResults.appendChild(empty);
+                return;
+            }
+
+            currentYoutubeSearchResults.forEach(result => {
+                const li = document.createElement('li');
+                li.className = 'flex items-center gap-2 bg-navy-950 border border-slate-800 rounded-xl p-3';
+
+                const info = document.createElement('div');
+                info.className = 'min-w-0 flex-1';
+                const title = document.createElement('p');
+                title.className = 'text-xs sm:text-sm font-bold text-white break-words';
+                title.textContent = result.title;
+                const sub = document.createElement('p');
+                sub.className = 'text-[11px] text-slate-400 mt-0.5';
+                const durationText = formatSearchDuration(result.lengthSeconds);
+                sub.textContent = `${result.channel}${durationText ? ` · ${durationText}` : ''}`;
+                info.append(title, sub);
+
+                const selectButton = document.createElement('button');
+                selectButton.type = 'button';
+                selectButton.className = 'shrink-0 px-3 py-2 rounded-lg bg-taxi-500 hover:bg-taxi-600 text-white text-xs font-bold';
+                selectButton.textContent = isRunning ? '선택·재생' : '선택';
+                selectButton.addEventListener('click', () => selectYoutubeSearchResult(result));
+
+                li.append(info, selectButton);
+                youtubeSearchResults.appendChild(li);
+            });
+        }
+
+        function selectYoutubeSearchResult(result) {
+            if (!result || !result.videoId) return;
             if (playlistPlayback.active) stopPlaylistPlayback();
-            const rawUrl = youtubeUrlInput.value.trim();
-            if (!rawUrl) {
-                isYoutubePlaying = false;
-                savedYoutubeVideoId = '';
-                savedYoutubeTitle = '';
-                savedYoutubeChannel = '';
-                localStorage.removeItem(STORAGE_KEYS.YOUTUBE_URL);
-                hideYoutubePlayer();
-                updateYoutubeControlsState();
-                updateYoutubeMetaCard();
-                return;
-            }
 
-            const videoId = extractYoutubeVideoId(rawUrl);
-            if (!videoId) {
-                showModal('올바르지 않은 링크', '유효한 YouTube URL(watch?v=, youtu.be/, shorts/)을 입력해주세요.');
-                return;
-            }
-
+            const videoId = result.videoId;
+            const watchUrl = `https://www.youtube.com/watch?v=${videoId}`;
             savedYoutubeVideoId = videoId;
-            showYoutubePlayer();
-            savedYoutubeTitle = '노래 제목을 불러오는 중...';
-            savedYoutubeChannel = '';
-            ytOpenOriginal.href = `https://www.youtube.com/watch?v=${videoId}`;
+            savedYoutubeTitle = result.title || `음원 트랙 (${videoId})`;
+            savedYoutubeChannel = result.channel || '';
+            isYoutubePlaying = false;
+            youtubeHasStarted = false;
+
+            // 선택한 뒤에는 검색어를 지우되, 실제 곡 제목은 재생 정보 카드에 표시합니다.
+            youtubeUrlInput.value = '';
+            youtubeSearchResults.innerHTML = '';
+            currentYoutubeSearchResults = [];
+            ytOpenOriginal.href = watchUrl;
             try {
-                localStorage.setItem(STORAGE_KEYS.YOUTUBE_URL, rawUrl);
+                localStorage.setItem(STORAGE_KEYS.YOUTUBE_URL, watchUrl);
             } catch (err) {}
 
-            await fetchYoutubeMetadata(videoId, rawUrl);
+            showYoutubePlayer();
+            updateYoutubeControlsState();
+            updateYoutubeMetaCard();
+
             if (isRunning) {
                 startYoutubePlayback();
             } else {
-                updateYoutubeControlsState();
-                showModal('음원 불러오기 완료 🎵', `"${savedYoutubeTitle}" 음원 정보를 불러왔습니다. 탑승 버튼을 누른 뒤 재생할 수 있습니다!`);
+                showModal('음원 선택 완료 🎵', `"${savedYoutubeTitle}" 곡을 선택했습니다. 탑승 후 음원 재생 버튼을 눌러주세요!`);
+            }
+        }
+
+        btnYtApply.addEventListener('click', async () => {
+            if (isYoutubeSearching) return;
+            const query = youtubeUrlInput.value.trim();
+            if (!query) {
+                youtubeUrlInput.focus();
+                return;
+            }
+
+            // 기존 링크 붙여넣기도 계속 지원합니다. 링크라면 바로 곡을 선택합니다.
+            const directVideoId = extractYoutubeVideoId(query);
+            if (directVideoId) {
+                try {
+                    const metadata = await requestYoutubeMetadata(directVideoId, query);
+                    selectYoutubeSearchResult({
+                        videoId: directVideoId,
+                        title: metadata.title,
+                        channel: metadata.channel,
+                        lengthSeconds: 0
+                    });
+                } catch (err) {
+                    selectYoutubeSearchResult({
+                        videoId: directVideoId,
+                        title: `음원 트랙 (${directVideoId})`,
+                        channel: '',
+                        lengthSeconds: 0
+                    });
+                }
+                return;
+            }
+
+            if (playlistPlayback.active) stopPlaylistPlayback();
+            isYoutubeSearching = true;
+            btnYtApply.disabled = true;
+            btnYtApply.textContent = '검색 중';
+            youtubeSearchResults.innerHTML = '<li class="text-center py-3 text-xs text-slate-400">노래를 검색하고 있습니다...</li>';
+            try {
+                const results = await searchYoutubeByTitle(query);
+                renderYoutubeTitleSearchResults(results);
+            } catch (err) {
+                console.warn('일반 음원 제목 검색 실패:', err);
+                youtubeSearchResults.innerHTML = '';
+                const errorItem = document.createElement('li');
+                errorItem.className = 'text-center py-3 px-3 text-xs text-rose-300 bg-rose-500/10 border border-rose-500/30 rounded-xl';
+                errorItem.textContent = `검색 실패: ${err?.message || '검색 서버에 연결할 수 없습니다.'}`;
+                youtubeSearchResults.appendChild(errorItem);
+            } finally {
+                isYoutubeSearching = false;
+                btnYtApply.disabled = false;
+                btnYtApply.textContent = '검색';
             }
         });
 
-        // 메인 링크 입력창에서도 엔터를 누르면 링크 적용을 실행합니다.
+        // 일반 음원 검색창에서도 엔터를 누르면 제목 검색을 실행합니다.
         youtubeUrlInput.addEventListener('keydown', (event) => {
             if (event.key === 'Enter') {
                 event.preventDefault();
@@ -2477,7 +2565,7 @@
             savedYoutubeVideoId = track.videoId;
             savedYoutubeTitle = track.title || `음원 트랙 (${track.videoId})`;
             savedYoutubeChannel = track.channel || '';
-            youtubeUrlInput.value = track.url || `https://www.youtube.com/watch?v=${track.videoId}`;
+            youtubeUrlInput.value = ''; // 재생할 곡은 아래 재생 정보 카드에 표시하고 검색창은 비워둡니다.
             ytOpenOriginal.href = `https://www.youtube.com/watch?v=${track.videoId}`;
             isYoutubePlaying = true;
             try {
@@ -2579,7 +2667,7 @@
             savedYoutubeVideoId = track.videoId;
             savedYoutubeTitle = track.title || `음원 트랙 (${track.videoId})`;
             savedYoutubeChannel = track.channel || '';
-            youtubeUrlInput.value = track.url || `https://www.youtube.com/watch?v=${track.videoId}`;
+            youtubeUrlInput.value = ''; // 재생할 곡은 아래 재생 정보 카드에 표시하고 검색창은 비워둡니다.
             ytOpenOriginal.href = `https://www.youtube.com/watch?v=${track.videoId}`;
             try {
                 localStorage.setItem(STORAGE_KEYS.YOUTUBE_URL, youtubeUrlInput.value);
@@ -2599,7 +2687,7 @@
             loadFromStorage();
             if (savedYoutubeVideoId) {
                 const initialUrl = `https://www.youtube.com/watch?v=${savedYoutubeVideoId}`;
-                youtubeUrlInput.value = initialUrl;
+                youtubeUrlInput.value = ''; // 저장된 음원은 유지하되 제목 검색창은 비워둡니다.
                 ytOpenOriginal.href = initialUrl;
                 showYoutubePlayer();
                 fetchYoutubeMetadata(savedYoutubeVideoId, initialUrl);
