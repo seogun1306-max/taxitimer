@@ -625,7 +625,7 @@
                     <span class="text-2xl">🎵</span>
                     <div>
                         <h2 class="font-bold text-lg text-white">유튜브 플레이리스트</h2>
-                        <p class="text-xs text-slate-400 mt-0.5">탑승(타이머 작동) 중에 노래 제목이나 가수 이름으로 검색해 플레이리스트에 등록할 수 있습니다.</p>
+                        <p class="text-xs text-slate-400 mt-0.5">탑승 여부와 관계없이 노래 제목이나 가수 이름으로 검색해 플레이리스트를 만들고 음원을 등록할 수 있습니다. 실제 음악 재생은 탑승 중 또는 쉬는시간에 가능합니다.</p>
                     </div>
                 </div>
 
@@ -1273,9 +1273,9 @@
                 const activeList = getActivePlaylist();
                 const alreadyAdded = !!(activeList && activeList.tracks.some(track => track.videoId === result.videoId));
                 addButton.textContent = alreadyAdded ? '등록됨' : '추가';
-                addButton.dataset.songSearchAction = 'true';
+                addButton.dataset.playlistAddAction = 'true';
                 addButton.dataset.alreadyAdded = String(alreadyAdded);
-                addButton.disabled = alreadyAdded || !canUseSongFeatures();
+                addButton.disabled = alreadyAdded;
                 addButton.classList.toggle('opacity-50', addButton.disabled);
                 addButton.classList.toggle('cursor-not-allowed', addButton.disabled);
                 addButton.addEventListener('click', () => addSearchedTrackToPlaylist(result, addButton));
@@ -1286,10 +1286,7 @@
         }
 
         function addSearchedTrackToPlaylist(result, button) {
-            if (!canUseSongFeatures()) {
-                showModal('주행 중 전용 기능 🎵', '검색 결과 등록은 주행 중 또는 쉬는시간에 할 수 있습니다.');
-                return;
-            }
+            // 플레이리스트 편집은 탑승 여부와 관계없이 허용합니다.
             const activeList = getActivePlaylist();
             if (!activeList) {
                 showModal('플레이리스트 필요', '먼저 플레이리스트를 만들어주세요.');
@@ -1318,10 +1315,7 @@
 
         playlistTrackForm.addEventListener('submit', async (e) => {
             e.preventDefault();
-            if (!canUseSongFeatures()) {
-                showModal('주행 중 전용 기능 🎵', '노래 검색과 플레이리스트 등록은 주행 중 또는 쉬는시간에 할 수 있습니다.');
-                return;
-            }
+            // 플레이리스트 곡 검색 및 등록은 대기 중에도 사용할 수 있습니다.
             if (isPlaylistSearching) return;
             const activeList = getActivePlaylist();
             const query = playlistTrackUrl.value.trim();
@@ -1347,10 +1341,6 @@
                         return;
                     }
                     const metadata = await requestYoutubeMetadata(directVideoId, query);
-                    if (!canUseSongFeatures()) {
-                        showModal('주행 중 전용 기능 🎵', '검색이 끝나기 전에 타이머가 정차되어 음원을 등록하지 않았습니다. 다시 탑승한 뒤 등록해주세요.');
-                        return;
-                    }
                     const latestList = getActivePlaylist();
                     if (!latestList) return;
                     latestList.tracks.push({
@@ -1367,11 +1357,7 @@
                     playlistSearchResults.innerHTML = '';
                 } else {
                     const results = await searchYoutubeByTitle(query);
-                    if (!canUseSongFeatures()) {
-                        playlistSearchResults.innerHTML = '<li class="text-center py-4 text-xs text-amber-300">타이머가 정지되어 검색 결과를 숨겼습니다. 다시 탑승하거나 쉬는시간에 검색해주세요.</li>';
-                    } else {
-                        renderPlaylistSearchResults(results);
-                    }
+                    renderPlaylistSearchResults(results);
                 }
             } catch (err) {
                 console.warn('노래 제목 검색 실패:', err);
@@ -2296,16 +2282,16 @@
             btnYtApply.classList.toggle('cursor-not-allowed', !canSearch || generalSearchBusy);
             youtubeUrlInput.title = canSearch ? '노래 제목이나 가수 이름을 검색하세요.' : '주행 중 또는 쉬는시간에 노래를 검색할 수 있습니다.';
 
-            playlistTrackUrl.disabled = !canSearch || playlistSearchBusy;
-            btnAddPlaylistTrack.disabled = !canSearch || playlistSearchBusy;
-            playlistTrackUrl.placeholder = canSearch
-                ? '노래 제목 또는 가수 이름 입력'
-                : (isBreakTime ? '쉬는시간에도 플레이리스트 검색 가능' : '탑승하면 플레이리스트 음원을 검색할 수 있습니다');
-            btnAddPlaylistTrack.classList.toggle('opacity-50', !canSearch || playlistSearchBusy);
-            btnAddPlaylistTrack.classList.toggle('cursor-not-allowed', !canSearch || playlistSearchBusy);
-            playlistTrackUrl.title = canSearch ? '노래 제목이나 가수 이름을 검색하세요.' : '주행 중 또는 쉬는시간에 노래를 검색할 수 있습니다.';
+            // 플레이리스트 편집·검색은 타이머가 대기 중이어도 항상 허용합니다.
+            playlistTrackUrl.disabled = playlistSearchBusy;
+            btnAddPlaylistTrack.disabled = playlistSearchBusy;
+            playlistTrackUrl.placeholder = '노래 제목 또는 가수 이름 입력';
+            btnAddPlaylistTrack.classList.toggle('opacity-50', playlistSearchBusy);
+            btnAddPlaylistTrack.classList.toggle('cursor-not-allowed', playlistSearchBusy);
+            playlistTrackUrl.title = '탑승 여부와 관계없이 노래를 검색해 플레이리스트에 등록할 수 있습니다.';
 
-            // 검색 결과 버튼도 주행 또는 자동 쉬는시간이 아닐 때만 잠급니다.
+            // 기본화면의 일반 음원 검색 결과 선택 버튼만 주행 또는 자동 쉬는시간에 활성화합니다.
+            // 플레이리스트의 추가 버튼은 data-playlist-add-action을 사용하므로 항상 등록할 수 있습니다.
             document.querySelectorAll('[data-song-search-action]').forEach(button => {
                 button.disabled = !canSearch || button.dataset.alreadyAdded === 'true';
                 button.classList.toggle('opacity-50', button.disabled);
@@ -2971,8 +2957,17 @@
         // version: 버전, title: 업데이트 제목, changes: 변경 사항 배열
         // -----------------------------------------------------------------
         const PATCH_NOTES_STORAGE_KEY = 'taxi_timer_patch_notes_hidden_date_v1';
-        const CURRENT_APP_VERSION = 'v2.0.3';
+        const CURRENT_APP_VERSION = 'v2.0.4';
         const PATCH_NOTES = [
+            {
+                version: 'v2.0.4',
+                title: '플레이리스트 편집 상시 허용',
+                changes: [
+                    '탑승 전이나 타이머 대기 중에도 플레이리스트를 만들고 삭제할 수 있습니다.',
+                    '탑승 여부와 관계없이 노래 제목 검색과 음원 등록이 가능합니다.',
+                    '기본화면의 일반 음원 검색과 실제 음악 재생은 기존처럼 탑승 중 또는 쉬는시간에만 가능합니다.'
+                ]
+            },
             {
                 version: 'v2.0.3',
                 title: '플레이리스트 검색 결과 자동 정리',
