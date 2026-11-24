@@ -245,7 +245,7 @@
             <div class="app-loading-track" aria-label="로딩 진행 중">
                 <div class="app-loading-fill"></div>
             </div>
-            <p class="mt-4 text-[11px] text-slate-500 font-mono">v2.0.2</p>
+            <p class="mt-4 text-[11px] text-slate-500 font-mono">v2.0.5</p>
         </div>
     </div>
 
@@ -258,7 +258,7 @@
                     <h2 id="patch-notes-title" class="mt-1 text-xl font-black text-white">🚕 택시타이머 패치노트</h2>
                     <p class="mt-1 text-xs text-slate-400">새로운 기능과 지금까지의 업데이트 내역</p>
                 </div>
-                <span id="patch-notes-current-version" class="shrink-0 rounded-lg border border-taxi-500/30 bg-taxi-500/10 px-2.5 py-1 text-xs font-bold text-taxi-400">v2.0.2</span>
+                <span id="patch-notes-current-version" class="shrink-0 rounded-lg border border-taxi-500/30 bg-taxi-500/10 px-2.5 py-1 text-xs font-bold text-taxi-400">v2.0.5</span>
             </div>
             <div id="patch-notes-list" class="min-h-0 flex-1 overflow-y-auto px-5 py-4">
                 <!-- PATCH_NOTES 배열을 JavaScript가 버전별로 표시합니다. -->
@@ -577,6 +577,19 @@
 
         <!-- [화면 3] 설정 화면 -->
         <div id="view-settings" class="hidden space-y-6 tab-panel-animate">
+            <!-- 설정에서 언제든 다시 열 수 있는 업데이트 내역 -->
+            <section class="bg-navy-900 border border-slate-800 rounded-2xl p-5 shadow-lg flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <div class="flex items-center gap-3 min-w-0">
+                    <span class="text-2xl shrink-0">📢</span>
+                    <div class="min-w-0">
+                        <h2 class="font-bold text-base text-white">업데이트 내역</h2>
+                        <p class="text-xs text-slate-400 mt-0.5">택시타이머의 주요 기능 추가와 개선 사항을 확인할 수 있습니다.</p>
+                    </div>
+                </div>
+                <button id="btn-open-patch-notes-settings" type="button" class="shrink-0 bg-taxi-500 hover:bg-taxi-600 active:scale-95 text-white font-bold px-4 py-3 rounded-xl text-sm transition-all">
+                    📋 패치노트 보기 · v2.0.5
+                </button>
+            </section>
             <section class="bg-navy-900 border border-slate-800 rounded-2xl p-5 sm:p-6 shadow-lg space-y-5">
                 <div class="flex items-center gap-2.5 border-b border-slate-800 pb-4">
                     <span class="text-2xl">⚙️</span>
@@ -2960,132 +2973,105 @@
         const CURRENT_APP_VERSION = 'v2.0.4';
         const PATCH_NOTES = [
             {
+                version: 'v2.0.5',
+                title: '설정에서 패치노트 다시 보기',
+                changes: [
+                    '설정 화면에서 패치노트를 언제든 다시 열 수 있습니다.',
+                    '초기 구성이나 단순한 화면 조정은 제외하고 주요 기능 추가와 개선 사항 위주로 업데이트 내역을 정리했습니다.'
+                ]
+            },
+            {
                 version: 'v2.0.4',
                 title: '플레이리스트 편집 상시 허용',
                 changes: [
-                    '탑승 전이나 타이머 대기 중에도 플레이리스트를 만들고 삭제할 수 있습니다.',
-                    '탑승 여부와 관계없이 노래 제목 검색과 음원 등록이 가능합니다.',
-                    '기본화면의 일반 음원 검색과 실제 음악 재생은 기존처럼 탑승 중 또는 쉬는시간에만 가능합니다.'
+                    '탑승 전에도 플레이리스트를 만들고, 노래를 검색해 등록하거나 목록을 관리할 수 있습니다.',
+                    '실제 음악 재생은 기존 주행·쉬는시간 조건을 따릅니다.'
                 ]
             },
             {
                 version: 'v2.0.3',
-                title: '플레이리스트 검색 결과 자동 정리',
+                title: '플레이리스트 등록 후 검색 결과 정리',
                 changes: [
-                    '음원을 플레이리스트에 등록하면 검색창의 제목뿐 아니라 검색 결과 목록도 함께 사라집니다.',
-                    '유튜브 링크를 직접 등록한 경우에도 이전 검색 결과를 비워 중복 등록을 방지합니다.'
+                    '음원을 등록하면 검색 입력창과 검색 결과 목록을 함께 비워 중복 선택을 방지합니다.'
                 ]
             },
             {
                 version: 'v2.0.2',
                 title: '모바일 포커스 이탈 시 자동 정차',
                 changes: [
-                    '휴대전화나 태블릿에서 앱이 백그라운드로 가거나 포커스를 잃으면 주행 타이머가 자동으로 정차합니다.',
-                    '앱으로 돌아와도 타이머가 자동 출발하지 않으며, 출발 버튼을 직접 눌러야 다시 시작합니다.',
-                    '쉬는시간 중 포커스를 잃으면 남은 쉬는시간을 보존하고 자동 출발을 막습니다.'
+                    '모바일에서 앱이 백그라운드로 가거나 화면을 벗어나면 타이머가 자동으로 정차합니다.',
+                    '앱으로 돌아와도 자동 출발하지 않으며, 쉬는시간 중 이탈하면 남은 휴식 시간도 보존합니다.'
                 ]
             },
             {
                 version: 'v2.0.1',
-                title: '유튜브 시작 상태 및 반복 버튼 수정',
+                title: '유튜브 초기 재생 및 반복 제어 개선',
                 changes: [
-                    '앱을 다시 열면 이전에 선택한 유튜브 음원을 자동으로 불러오거나 재생하지 않습니다.',
-                    '앱 종료 또는 페이지 이동 시 유튜브 플레이어 프레임을 비워 백그라운드 재생을 방지합니다.',
-                    '노래 재생 중 반복 켜기/끄기를 눌러도 플레이어를 다시 로드하지 않아 현재 재생 위치가 유지됩니다.',
-                    '단일 음원 반복은 곡 종료 이벤트에서 현재 곡을 처음부터 다시 재생하도록 처리합니다.'
+                    '앱을 다시 열었을 때 이전 유튜브 음원이 자동으로 불러와 재생되는 동작을 막았습니다.',
+                    '반복 켜기·끄기를 변경해도 현재 재생 위치가 초기화되지 않도록 수정했습니다.'
                 ]
             },
             {
                 version: 'v2.0.0',
-                title: '시작 화면 및 패치노트 추가',
+                title: '시작 로딩 화면과 버전별 패치노트',
                 changes: [
-                    '앱을 켜면 🚖택시타이머🚕 로딩 화면과 둥근 끝의 진행 바가 표시됩니다.',
-                    '로딩이 끝나면 버전별 패치노트가 열립니다.',
-                    '확인 버튼과 오늘 하루 표시 안하기 버튼을 추가했습니다.',
-                    '오늘 하루 표시 안하기를 누르면 오늘 날짜가 지나기 전까지 패치노트를 다시 표시하지 않습니다.'
+                    '앱 시작 시 택시타이머 로딩 화면을 표시하고, 로딩 후 업데이트 내역을 안내합니다.',
+                    '오늘 하루 패치노트 표시를 숨기는 설정을 추가했습니다.'
                 ]
             },
             {
                 version: 'v1.8.0',
                 title: '백색소음 반복 및 음원 종료 처리',
                 changes: [
-                    '백색소음이 끝나면 바로 다시 재생되도록 반복 동작을 보강했습니다.',
-                    '반복 재생을 켜지 않은 음원이 끝나면 링크와 유튜브 화면을 정리하도록 개선했습니다.'
+                    '백색소음이 끝나면 자동으로 다시 재생되도록 개선했습니다.',
+                    '반복하지 않는 음원이 끝나면 링크와 유튜브 재생 영역을 정리합니다.'
                 ]
             },
             {
                 version: 'v1.7.0',
                 title: '쉬는시간 음악 지원',
                 changes: [
-                    '자동 쉬는시간에도 현재 노래가 계속 재생되도록 변경했습니다.',
-                    '쉬는시간 중에도 노래 검색과 음원 선택을 할 수 있도록 개선했습니다.'
+                    '자동 쉬는시간에도 음악이 끊기지 않고 계속 재생됩니다.',
+                    '쉬는시간 중에도 노래 검색과 음원 선택을 할 수 있습니다.'
                 ]
             },
             {
                 version: 'v1.6.0',
-                title: '노래 제목 검색',
+                title: '노래 제목 검색 및 선택',
                 changes: [
-                    '유튜브 링크 대신 노래 제목이나 가수 이름으로 검색할 수 있도록 확장했습니다.',
-                    '기본화면과 플레이리스트에서 검색 결과를 선택해 음원을 재생·등록할 수 있습니다.',
-                    '노래를 선택하면 검색 입력창을 비우고 재생 정보에는 선택한 제목을 표시합니다.',
-                    '검색 서버 응답 형식과 연결 실패 시 대체 검색 경로 처리를 보강했습니다.',
-                    '타이머 작동 중과 자동 쉬는시간에 검색할 수 있도록 검색 가능 상태를 조정했습니다.'
+                    '유튜브 링크 대신 노래 제목이나 가수 이름으로 음원을 검색할 수 있습니다.',
+                    '검색 결과에서 영상을 선택해 바로 재생하거나 플레이리스트에 등록할 수 있습니다.'
                 ]
             },
             {
                 version: 'v1.5.0',
-                title: '모바일 화면 및 화면 꺼짐 개선',
+                title: '모바일 화면 꺼짐 방지 보강',
                 changes: [
-                    '모바일에서 공부 항목 추가 버튼이 화면 밖으로 밀리지 않도록 입력창과 버튼 배치를 조정했습니다.',
-                    '지원되는 모바일 브라우저에서 타이머 작동 중 화면 꺼짐을 줄이도록 화면 깨우기 기능을 추가했습니다.',
-                    '유튜브 화면의 크기와 미리보기 영역 표시를 다듬었습니다.'
+                    '지원되는 모바일 브라우저에서 타이머 작동 중 화면 깨우기 기능을 사용합니다.'
                 ]
             },
             {
                 version: 'v1.4.0',
-                title: '플레이리스트 순차 및 반복 재생',
+                title: '플레이리스트 순차 및 전체 반복 재생',
                 changes: [
-                    '플레이리스트 재생을 누르면 등록된 순서대로 노래가 이어서 재생됩니다.',
-                    '한 곡이 끝나면 다음 곡으로 자동 이동하고 마지막 곡에서 재생을 마칩니다.',
-                    '플레이리스트 반복을 켜면 마지막 곡 다음에 첫 곡으로 돌아갑니다.',
-                    '재생 중지와 이어 재생 기능을 추가했습니다.'
+                    '플레이리스트 곡을 등록된 순서대로 자동 재생합니다.',
+                    '전체 반복을 켜면 마지막 곡 다음에 첫 곡으로 돌아갑니다.'
                 ]
             },
             {
                 version: 'v1.3.0',
-                title: '플레이리스트 관리',
+                title: '플레이리스트 생성 및 음원 관리',
                 changes: [
-                    '설정 화면에서 플레이리스트를 만들고 삭제할 수 있도록 추가했습니다.',
-                    '음원 링크로 등록하면 영상 제목이 목록에 표시되도록 개선했습니다.',
-                    '등록한 음원을 선택해 재생하고 목록을 관리할 수 있도록 구성했습니다.'
+                    '설정에서 플레이리스트를 만들고 음원을 등록·삭제할 수 있습니다.',
+                    '등록된 음원을 선택해 재생할 수 있습니다.'
                 ]
             },
             {
                 version: 'v1.2.0',
-                title: '음원 재생 제어 및 화면 개선',
+                title: '음원 반복 및 종료 동작 개선',
                 changes: [
-                    '음원 반복 재생 버튼을 추가했습니다.',
-                    '노래가 끝났을 때 링크와 재생 화면을 정리하는 동작을 보강했습니다.',
-                    '유튜브 미리보기 화면을 키우고 불필요한 안내 문구를 제거했습니다.'
-                ]
-            },
-            {
-                version: 'v1.1.0',
-                title: '집중 사운드 및 기본 UI 개선',
-                changes: [
-                    '백색소음의 켜기·끄기와 볼륨 조절을 사용할 수 있습니다.',
-                    '모바일 화면에서 타이머, 음원 입력창, 설정 UI를 사용하기 편하도록 조정했습니다.'
-                ]
-            },
-            {
-                version: 'v1.0.0',
-                title: '택시타이머 최초 구성',
-                changes: [
-                    '공부 목적지를 추가하고 선택하는 기능을 구성했습니다.',
-                    '탑승, 정차, 출발, 지불, 초기화 타이머 기능을 구성했습니다.',
-                    '30초마다 가상 집중 요금이 쌓이는 미터기를 추가했습니다.',
-                    '집중 주기와 쉬는시간 설정, 집중 기록 및 완료한 목적지 기록을 추가했습니다.',
-                    '유튜브 링크 음원 재생과 미리보기, 백색소음 기능을 포함했습니다.'
+                    '개별 음원 반복 재생을 켜고 끌 수 있습니다.',
+                    '반복이 꺼진 음원이 끝나면 재생 상태와 입력 링크를 정리합니다.'
                 ]
             }
         ];
@@ -3153,6 +3139,11 @@
             renderPatchNotes();
             modal.classList.remove('hidden');
             modal.classList.add('flex');
+        }
+
+        const settingsPatchNotesButton = document.getElementById('btn-open-patch-notes-settings');
+        if (settingsPatchNotesButton) {
+            settingsPatchNotesButton.addEventListener('click', openPatchNotes);
         }
 
         const patchNotesConfirmButton = document.getElementById('btn-patch-notes-confirm');
