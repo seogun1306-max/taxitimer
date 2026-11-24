@@ -525,12 +525,13 @@
                     </div>
 
                     <form id="playlist-track-form" class="space-y-2">
-                        <label for="playlist-track-url" class="block text-sm font-bold text-slate-200">🔗 유튜브 링크 등록</label>
+                        <label for="playlist-track-url" class="block text-sm font-bold text-slate-200">🎵 노래 제목으로 등록</label>
                         <div class="flex gap-2">
-                            <input id="playlist-track-url" type="url" required placeholder="유튜브 링크를 붙여넣고 엔터" class="min-w-0 flex-1 bg-navy-950 border border-slate-700 focus:border-taxi-500 focus:outline-none rounded-xl px-3.5 py-3 text-sm text-white placeholder-slate-500">
-                            <button id="btn-add-playlist-track" type="submit" class="shrink-0 bg-slate-700 hover:bg-slate-600 text-white font-bold px-4 py-3 rounded-xl text-sm">등록</button>
+                            <input id="playlist-track-url" type="text" required autocomplete="off" placeholder="노래 제목 또는 가수 이름 입력" class="min-w-0 flex-1 bg-navy-950 border border-slate-700 focus:border-taxi-500 focus:outline-none rounded-xl px-3.5 py-3 text-sm text-white placeholder-slate-500">
+                            <button id="btn-add-playlist-track" type="submit" class="shrink-0 bg-slate-700 hover:bg-slate-600 text-white font-bold px-4 py-3 rounded-xl text-sm">검색</button>
                         </div>
-                        <p class="text-[11px] text-slate-500">링크를 등록하면 유튜브에서 제목과 채널을 불러와 아래 등록 목록에 표시합니다.</p>
+                        <p class="text-[11px] text-slate-500">노래 제목을 검색한 다음 원하는 영상의 '추가'를 누르면 플레이리스트에 등록됩니다. 기존 유튜브 링크를 붙여넣어 등록하는 것도 가능합니다.</p>
+                        <ul id="playlist-search-results" class="space-y-2"></ul>
                     </form>
 
                     <div class="border-t border-slate-800 pt-3 space-y-2">
@@ -821,6 +822,8 @@
         const playlistTrackUrl = document.getElementById('playlist-track-url');
         const btnAddPlaylistTrack = document.getElementById('btn-add-playlist-track');
         const playlistTrackList = document.getElementById('playlist-track-list');
+        const playlistSearchResults = document.getElementById('playlist-search-results');
+        let currentPlaylistSearchResults = [];
         const playlistTrackCount = document.getElementById('playlist-track-count');
         const btnPlayPlaylist = document.getElementById('btn-play-playlist');
 
@@ -887,7 +890,7 @@
             playlistTrackCount.textContent = `${tracks.length}곡`;
 
             if (!tracks.length) {
-                playlistTrackList.innerHTML = '<li class="text-center py-5 text-xs text-slate-500 bg-navy-950/50 rounded-xl border border-dashed border-slate-800">아직 등록된 음원이 없습니다. 위 링크 입력창에 유튜브 링크를 넣어주세요.</li>';
+                playlistTrackList.innerHTML = '<li class="text-center py-5 text-xs text-slate-500 bg-navy-950/50 rounded-xl border border-dashed border-slate-800">아직 등록된 음원이 없습니다. 위 입력창에서 노래 제목을 검색해 추가해주세요.</li>';
                 updatePlaylistPlaybackButton();
                 return;
             }
@@ -943,6 +946,7 @@
             playlistNameInput.value = '';
             savePlaylistsToStorage();
             renderPlaylistManager();
+            renderPlaylistSearchResults(currentPlaylistSearchResults);
         });
 
         playlistSelect.addEventListener('change', () => {
@@ -952,6 +956,7 @@
             activePlaylistId = playlistSelect.value;
             savePlaylistsToStorage();
             renderPlaylistManager();
+            renderPlaylistSearchResults(currentPlaylistSearchResults);
         });
 
         btnDeletePlaylist.addEventListener('click', () => {
@@ -965,49 +970,168 @@
                 activePlaylistId = youtubePlaylists.length ? youtubePlaylists[0].id : null;
                 savePlaylistsToStorage();
                 renderPlaylistManager();
+                renderPlaylistSearchResults(currentPlaylistSearchResults);
             });
         });
 
-        playlistTrackForm.addEventListener('submit', async (e) => {
-            e.preventDefault();
+        // 제목 검색은 공개 Invidious 검색 API를 이용합니다. 응답이 없는 인스턴스는 다음 주소로 자동 전환합니다.
+        // 현재 공개 인스턴스 목록: https://docs.invidious.io/instances/
+        const YOUTUBE_SEARCH_INSTANCES = [
+            'https://inv.nadeko.net',
+            'https://invidious.nerdvpn.de',
+            'https://yt.chocolatemoo53.com',
+            'https://invidious.tiekoetter.com'
+        ];
+
+        async function searchYoutubeByTitle(query) {
+            let lastError = null;
+            for (const instance of YOUTUBE_SEARCH_INSTANCES) {
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 9000);
+                try {
+                    const params = new URLSearchParams({ q: query, type: 'video', region: 'KR' });
+                    const response = await fetch(`${instance}/api/v1/search?${params.toString()}`, {
+                        method: 'GET',
+                        mode: 'cors',
+                        credentials: 'omit',
+                        signal: controller.signal,
+                        headers: { 'Accept': 'application/json' }
+                    });
+                    if (!response.ok) throw new Error(`검색 서버 응답 오류 (${response.status})`);
+                    const data = await response.json();
+                    const results = (Array.isArray(data) ? data : [])
+                        .filter(item => item && item.type === 'video' && /^[A-Za-z0-9_-]{11}$/.test(item.videoId || ''))
+                        .slice(0, 8)
+                        .map(item => ({
+                            videoId: item.videoId,
+                            title: item.title || '제목 없는 영상',
+                            channel: item.author || 'YouTube',
+                            lengthSeconds: Number(item.lengthSeconds) || 0
+                        }));
+                    if (!results.length) throw new Error('검색 결과가 없습니다.');
+                    return results;
+                } catch (err) {
+                    lastError = err;
+                } finally {
+                    clearTimeout(timeoutId);
+                }
+            }
+            throw lastError || new Error('YouTube 검색에 실패했습니다.');
+        }
+
+        function formatSearchDuration(seconds) {
+            if (!seconds || seconds < 0) return '';
+            const minutes = Math.floor(seconds / 60);
+            const remainder = seconds % 60;
+            return `${minutes}:${String(remainder).padStart(2, '0')}`;
+        }
+
+        function renderPlaylistSearchResults(results) {
+            currentPlaylistSearchResults = Array.isArray(results) ? results : [];
+            playlistSearchResults.innerHTML = '';
+            if (!currentPlaylistSearchResults.length) return;
+
+            currentPlaylistSearchResults.forEach(result => {
+                const li = document.createElement('li');
+                li.className = 'flex items-center gap-2 bg-navy-950 border border-slate-800 rounded-xl p-3';
+
+                const info = document.createElement('div');
+                info.className = 'min-w-0 flex-1';
+                const title = document.createElement('p');
+                title.className = 'text-xs sm:text-sm font-bold text-white break-words';
+                title.textContent = result.title;
+                const sub = document.createElement('p');
+                sub.className = 'text-[11px] text-slate-400 mt-0.5';
+                const durationText = formatSearchDuration(result.lengthSeconds);
+                sub.textContent = `${result.channel}${durationText ? ` · ${durationText}` : ''}`;
+                info.append(title, sub);
+
+                const addButton = document.createElement('button');
+                addButton.type = 'button';
+                addButton.className = 'shrink-0 px-3 py-2 rounded-lg bg-taxi-500 hover:bg-taxi-600 disabled:bg-slate-800 disabled:text-slate-500 text-white text-xs font-bold';
+                const activeList = getActivePlaylist();
+                const alreadyAdded = !!(activeList && activeList.tracks.some(track => track.videoId === result.videoId));
+                addButton.textContent = alreadyAdded ? '등록됨' : '추가';
+                addButton.disabled = alreadyAdded;
+                addButton.addEventListener('click', () => addSearchedTrackToPlaylist(result, addButton));
+
+                li.append(info, addButton);
+                playlistSearchResults.appendChild(li);
+            });
+        }
+
+        function addSearchedTrackToPlaylist(result, button) {
             const activeList = getActivePlaylist();
-            const rawUrl = playlistTrackUrl.value.trim();
             if (!activeList) {
                 showModal('플레이리스트 필요', '먼저 플레이리스트를 만들어주세요.');
                 return;
             }
-            if (!rawUrl) return;
-            const videoId = extractYoutubeVideoId(rawUrl);
-            if (!videoId) {
-                showModal('올바르지 않은 링크', '유효한 YouTube 링크를 입력해주세요.');
-                return;
-            }
-            if (activeList.tracks.some(track => track.videoId === videoId)) {
-                showModal('이미 등록된 음원', '현재 플레이리스트에 이미 등록된 음원입니다.');
+            if (activeList.tracks.some(track => track.videoId === result.videoId)) {
+                button.textContent = '등록됨';
+                button.disabled = true;
                 return;
             }
 
+            activeList.tracks.push({
+                id: `${result.videoId}-${Date.now()}`,
+                videoId: result.videoId,
+                url: `https://www.youtube.com/watch?v=${result.videoId}`,
+                title: result.title,
+                channel: result.channel
+            });
+            savePlaylistsToStorage();
+            renderPlaylistManager();
+            renderPlaylistSearchResults(currentPlaylistSearchResults);
+        }
+
+        playlistTrackForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const activeList = getActivePlaylist();
+            const query = playlistTrackUrl.value.trim();
+            if (!activeList) {
+                showModal('플레이리스트 필요', '먼저 플레이리스트를 만들어주세요.');
+                return;
+            }
+            if (!query) return;
+
             btnAddPlaylistTrack.disabled = true;
-            btnAddPlaylistTrack.textContent = '불러오는 중';
+            btnAddPlaylistTrack.textContent = '검색 중';
+            playlistSearchResults.innerHTML = '<li class="text-center py-4 text-xs text-slate-400">노래를 검색하고 있습니다...</li>';
             try {
-                const metadata = await requestYoutubeMetadata(videoId, rawUrl);
-                const latestList = getActivePlaylist();
-                if (!latestList) return;
-                latestList.tracks.push({
-                    id: `${videoId}-${Date.now()}`,
-                    videoId,
-                    url: rawUrl,
-                    title: metadata.title || `음원 (${videoId})`,
-                    channel: metadata.channel || ''
-                });
-                savePlaylistsToStorage();
-                renderPlaylistManager();
-                playlistTrackUrl.value = '';
+                // 예전처럼 YouTube 링크를 붙여넣은 경우도 계속 등록할 수 있도록 유지합니다.
+                const directVideoId = extractYoutubeVideoId(query);
+                if (directVideoId) {
+                    const existingList = getActivePlaylist();
+                    if (existingList && existingList.tracks.some(track => track.videoId === directVideoId)) {
+                        showModal('이미 등록된 음원', '현재 플레이리스트에 이미 등록된 음원입니다.');
+                        playlistSearchResults.innerHTML = '';
+                        return;
+                    }
+                    const metadata = await requestYoutubeMetadata(directVideoId, query);
+                    const latestList = getActivePlaylist();
+                    if (!latestList) return;
+                    latestList.tracks.push({
+                        id: `${directVideoId}-${Date.now()}`,
+                        videoId: directVideoId,
+                        url: query,
+                        title: metadata.title || `음원 (${directVideoId})`,
+                        channel: metadata.channel || ''
+                    });
+                    savePlaylistsToStorage();
+                    renderPlaylistManager();
+                    playlistTrackUrl.value = '';
+                    playlistSearchResults.innerHTML = '';
+                } else {
+                    const results = await searchYoutubeByTitle(query);
+                    renderPlaylistSearchResults(results);
+                }
             } catch (err) {
-                showModal('음원 등록 실패', '영상 정보를 불러오지 못했습니다. 링크를 확인한 뒤 다시 시도해주세요.');
+                console.warn('노래 제목 검색 실패:', err);
+                playlistSearchResults.innerHTML = '';
+                showModal('노래 검색 실패', '검색 서버에 연결하지 못했거나 결과가 없습니다. 잠시 후 다시 시도해주세요.');
             } finally {
                 btnAddPlaylistTrack.disabled = false;
-                btnAddPlaylistTrack.textContent = '등록';
+                btnAddPlaylistTrack.textContent = '검색';
             }
         });
 
