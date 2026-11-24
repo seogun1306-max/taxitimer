@@ -3,6 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- 브라우저 탭 및 홈 화면 바로가기 아이콘 -->
+    <meta name="theme-color" content="#0f172a">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="택시타이머">
+    <link rel="icon" type="image/png" sizes="32x32" href="./favicon-32.png">
+    <link rel="icon" type="image/png" sizes="192x192" href="./taxi-icon-192.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="./taxi-apple-touch-icon.png">
+    <link rel="manifest" href="./manifest.webmanifest">
     <title>🚖택시타이머🚕</title>
     <!-- Tailwind CSS 불러오기 -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -245,7 +253,7 @@
             <div class="app-loading-track" aria-label="로딩 진행 중">
                 <div class="app-loading-fill"></div>
             </div>
-            <p class="mt-4 text-[11px] text-slate-500 font-mono">v2.0.5</p>
+            <p class="mt-4 text-[11px] text-slate-500 font-mono">v2.0.7</p>
         </div>
     </div>
 
@@ -258,12 +266,12 @@
                     <h2 id="patch-notes-title" class="mt-1 text-xl font-black text-white">🚕 택시타이머 패치노트</h2>
                     <p class="mt-1 text-xs text-slate-400">새로운 기능과 지금까지의 업데이트 내역</p>
                 </div>
-                <span id="patch-notes-current-version" class="shrink-0 rounded-lg border border-taxi-500/30 bg-taxi-500/10 px-2.5 py-1 text-xs font-bold text-taxi-400">v2.0.5</span>
+                <span id="patch-notes-current-version" class="shrink-0 rounded-lg border border-taxi-500/30 bg-taxi-500/10 px-2.5 py-1 text-xs font-bold text-taxi-400">v2.0.7</span>
             </div>
             <div id="patch-notes-list" class="min-h-0 flex-1 overflow-y-auto px-5 py-4">
                 <!-- PATCH_NOTES 배열을 JavaScript가 버전별로 표시합니다. -->
             </div>
-            <div class="grid grid-cols-1 gap-2 border-t border-slate-800 bg-navy-950/70 p-4 sm:grid-cols-2">
+            <div id="patch-notes-actions" class="grid grid-cols-1 gap-2 border-t border-slate-800 bg-navy-950/70 p-4 sm:grid-cols-2">
                 <button id="btn-patch-notes-confirm" type="button" class="order-1 rounded-xl bg-taxi-500 px-4 py-3 text-sm font-bold text-white transition-colors hover:bg-taxi-600">확인</button>
                 <button id="btn-patch-notes-hide-today" type="button" class="order-2 rounded-xl border border-slate-700 bg-slate-800 px-4 py-3 text-sm font-bold text-slate-200 transition-colors hover:bg-slate-700">오늘 하루 표시 안하기</button>
             </div>
@@ -587,7 +595,7 @@
                     </div>
                 </div>
                 <button id="btn-open-patch-notes-settings" type="button" class="shrink-0 bg-taxi-500 hover:bg-taxi-600 active:scale-95 text-white font-bold px-4 py-3 rounded-xl text-sm transition-all">
-                    📋 패치노트 보기 · v2.0.5
+                    📋 패치노트 보기 · v2.0.7
                 </button>
             </section>
             <section class="bg-navy-900 border border-slate-800 rounded-2xl p-5 sm:p-6 shadow-lg space-y-5">
@@ -2970,8 +2978,24 @@
         // version: 버전, title: 업데이트 제목, changes: 변경 사항 배열
         // -----------------------------------------------------------------
         const PATCH_NOTES_STORAGE_KEY = 'taxi_timer_patch_notes_hidden_date_v1';
-        const CURRENT_APP_VERSION = 'v2.0.4';
+        const CURRENT_APP_VERSION = 'v2.0.7';
         const PATCH_NOTES = [
+            {
+                version: 'v2.0.7',
+                title: '설정에서 여는 패치노트 버튼 정리',
+                changes: [
+                    '설정 화면에서 직접 여는 패치노트에는 확인 버튼만 표시합니다.',
+                    '오늘 하루 표시 안하기 기능은 앱 시작 시 자동으로 표시되는 패치노트에서만 사용할 수 있습니다.'
+                ]
+            },
+            {
+                version: 'v2.0.6',
+                title: '홈 화면 바로가기 택시 아이콘',
+                changes: [
+                    '브라우저 탭과 모바일 홈 화면 바로가기 아이콘을 🚖 택시 이미지로 변경했습니다.',
+                    'Android용 웹앱 매니페스트와 iPhone/iPad용 홈 화면 아이콘을 추가했습니다.'
+                ]
+            },
             {
                 version: 'v2.0.5',
                 title: '설정에서 패치노트 다시 보기',
@@ -3133,9 +3157,16 @@
             modal.classList.remove('flex');
         }
 
-        function openPatchNotes() {
+        function openPatchNotes(fromSettings = false) {
             const modal = document.getElementById('patch-notes-modal');
             if (!modal) return;
+
+            // 설정에서 직접 열 때는 '오늘 하루 표시 안하기'를 숨기고 확인 버튼만 표시합니다.
+            const hideTodayButton = document.getElementById('btn-patch-notes-hide-today');
+            const actions = document.getElementById('patch-notes-actions');
+            if (hideTodayButton) hideTodayButton.classList.toggle('hidden', fromSettings);
+            if (actions) actions.classList.toggle('sm:grid-cols-2', !fromSettings);
+
             renderPatchNotes();
             modal.classList.remove('hidden');
             modal.classList.add('flex');
@@ -3143,7 +3174,7 @@
 
         const settingsPatchNotesButton = document.getElementById('btn-open-patch-notes-settings');
         if (settingsPatchNotesButton) {
-            settingsPatchNotesButton.addEventListener('click', openPatchNotes);
+            settingsPatchNotesButton.addEventListener('click', () => openPatchNotes(true));
         }
 
         const patchNotesConfirmButton = document.getElementById('btn-patch-notes-confirm');
@@ -3174,7 +3205,7 @@
                 } catch (error) {
                     hiddenToday = false;
                 }
-                if (!hiddenToday) openPatchNotes();
+                if (!hiddenToday) openPatchNotes(false);
             }, 1800);
         });
     </script>
